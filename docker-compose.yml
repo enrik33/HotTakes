@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: social_debate_postgres
+    container_name: hottakes_postgres
     environment:
       POSTGRES_USER: debateuser
       POSTGRES_PASSWORD: debatepass
@@ -22,7 +22,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: social_debate_backend
+    container_name: hottakes_backend
     environment:
       DATABASE_URL: postgresql://debateuser:debatepass@postgres:5432/social_debate
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID}
@@ -40,7 +40,7 @@ services:
 
   frontend:
     image: node:18-alpine
-    container_name: social_debate_frontend
+    container_name: hottakes_frontend
     working_dir: /app
     ports:
       - "5173:5173"

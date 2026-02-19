@@ -4,7 +4,7 @@ Topics API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Topic
+from app.models import Topic, Comment, Classification
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -76,7 +76,6 @@ async def get_topic(topic_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Topic not found")
     
     # Count by stance
-    from app.models import Classification
     from sqlalchemy import func
     
     stance_counts = db.query(

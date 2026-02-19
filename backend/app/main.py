@@ -1,4 +1,4 @@
-"""
+﻿"""
 FastAPI application main entry point.
 """
 from fastapi import FastAPI
@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Social Debate Analyzer",
+    title="HotTakes",
     description="Real-time analysis of Reddit debates",
     version="1.0.0",
     lifespan=lifespan,
@@ -54,7 +54,8 @@ app.include_router(timeline.router, prefix="/api", tags=["timeline"])
 async def root():
     """Root endpoint."""
     return {
-        "message": "Social Debate Analyzer API",
+        "message": "HotTakes API",
         "docs": "/docs",
         "version": "1.0.0",
     }
+

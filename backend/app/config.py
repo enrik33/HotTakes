@@ -1,4 +1,4 @@
-"""
+﻿"""
 Application configuration and settings.
 Loads from environment variables.
 """
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     # Database
-    database_url: str = "sqlite:///./test.db"  # Override with PostgreSQL in .env
+    database_url: str = "postgresql://debateuser:debatepass@localhost:5432/social_debate"
     database_echo: bool = False
 
     # Reddit API
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # API Settings
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
-    api_title: str = "Social Debate Analyzer"
+    api_title: str = "HotTakes"
 
     # Scheduler
     scheduler_enabled: bool = True
@@ -59,3 +59,4 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+

@@ -3,6 +3,7 @@ Health check and status endpoints.
 """
 from fastapi import APIRouter
 from datetime import datetime
+from sqlalchemy import text
 
 router = APIRouter()
 
@@ -19,7 +20,7 @@ async def health_check():
     db_status = "ok"
     try:
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
     except Exception as e:
         db_status = f"error: {str(e)}"

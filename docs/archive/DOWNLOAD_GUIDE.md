@@ -5,7 +5,7 @@ Use this guide when cloning or downloading the repository fresh.
 ## 1. Get the Repository
 
 ```powershell
-git clone https://github.com/yourusername/HotTakes.git
+git clone https://github.com/enrik33/HotTakes.git
 cd HotTakes
 ```
 

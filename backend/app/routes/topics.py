@@ -2,11 +2,13 @@
 Topics API endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends
 from app.database import get_db
+from app.errors import raise_api_error
 from app.models import Topic, Comment, Classification
+from app.schemas.error import ErrorResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -51,12 +53,36 @@ async def list_topics(db: Session = Depends(get_db)):
     return {"topics": result}
 
 
-@router.post("/topics")
+@router.post(
+    "/topics",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Topic already exists",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": "TOPIC_ALREADY_EXISTS",
+                            "message": "Topic already exists",
+                            "details": None,
+                        },
+                        "request_id": "optional-id",
+                    }
+                }
+            },
+        }
+    },
+)
 async def create_topic(topic: TopicCreate, db: Session = Depends(get_db)):
     """Create a new topic."""
     existing = db.query(Topic).filter(Topic.name == topic.name).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Topic already exists")
+        raise_api_error(
+            status_code=400,
+            code="TOPIC_ALREADY_EXISTS",
+            message="Topic already exists",
+        )
 
     new_topic = Topic(name=topic.name, description=topic.description)
     db.add(new_topic)
@@ -71,12 +97,36 @@ async def create_topic(topic: TopicCreate, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/topics/{topic_id}")
+@router.get(
+    "/topics/{topic_id}",
+    responses={
+        404: {
+            "model": ErrorResponse,
+            "description": "Topic not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": "TOPIC_NOT_FOUND",
+                            "message": "Topic not found",
+                            "details": None,
+                        },
+                        "request_id": "optional-id",
+                    }
+                }
+            },
+        }
+    },
+)
 async def get_topic(topic_id: int, db: Session = Depends(get_db)):
     """Get topic details and stats."""
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
+        raise_api_error(
+            status_code=404,
+            code="TOPIC_NOT_FOUND",
+            message="Topic not found",
+        )
 
     # Count by stance
     from sqlalchemy import func

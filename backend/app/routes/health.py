@@ -1,6 +1,7 @@
 """
 Health check and status endpoints.
 """
+
 from fastapi import APIRouter
 from datetime import datetime
 from sqlalchemy import text
@@ -15,7 +16,7 @@ app_start_time = datetime.utcnow()
 async def health_check():
     """Health check endpoint."""
     from app.database import SessionLocal
-    
+
     # Check database connection
     db_status = "ok"
     try:
@@ -24,9 +25,9 @@ async def health_check():
         db.close()
     except Exception as e:
         db_status = f"error: {str(e)}"
-    
+
     uptime_seconds = (datetime.utcnow() - app_start_time).total_seconds()
-    
+
     return {
         "status": "ok" if db_status == "ok" else "degraded",
         "version": "1.0.0",

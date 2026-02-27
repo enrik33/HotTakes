@@ -1,6 +1,7 @@
 """
 Scheduler for background tasks using APScheduler.
 """
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.config import settings
@@ -40,7 +41,7 @@ def start_scheduler():
             name="Compute daily stats",
             replace_existing=True,
         )
-        
+
         scheduler.start()
 
 

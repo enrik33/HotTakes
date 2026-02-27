@@ -1,6 +1,7 @@
 """
 Topics API endpoints.
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -35,16 +36,18 @@ async def list_topics(db: Session = Depends(get_db)):
     topics = db.query(Topic).all()
     result = []
     for topic in topics:
-        result.append({
-            "id": topic.id,
-            "name": topic.name,
-            "description": topic.description,
-            "status": topic.status,
-            "post_count": len(topic.posts),
-            "comment_count": len(topic.comments),
-            "created_at": topic.created_at.isoformat(),
-            "updated_at": topic.updated_at.isoformat(),
-        })
+        result.append(
+            {
+                "id": topic.id,
+                "name": topic.name,
+                "description": topic.description,
+                "status": topic.status,
+                "post_count": len(topic.posts),
+                "comment_count": len(topic.comments),
+                "created_at": topic.created_at.isoformat(),
+                "updated_at": topic.updated_at.isoformat(),
+            }
+        )
     return {"topics": result}
 
 
@@ -54,12 +57,12 @@ async def create_topic(topic: TopicCreate, db: Session = Depends(get_db)):
     existing = db.query(Topic).filter(Topic.name == topic.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Topic already exists")
-    
+
     new_topic = Topic(name=topic.name, description=topic.description)
     db.add(new_topic)
     db.commit()
     db.refresh(new_topic)
-    
+
     return {
         "id": new_topic.id,
         "name": new_topic.name,
@@ -74,15 +77,18 @@ async def get_topic(topic_id: int, db: Session = Depends(get_db)):
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
+
     # Count by stance
     from sqlalchemy import func
-    
-    stance_counts = db.query(
-        Classification.stance,
-        func.count(Classification.id)
-    ).join(Comment).filter(Comment.topic_id == topic_id).group_by(Classification.stance).all()
-    
+
+    stance_counts = (
+        db.query(Classification.stance, func.count(Classification.id))
+        .join(Comment)
+        .filter(Comment.topic_id == topic_id)
+        .group_by(Classification.stance)
+        .all()
+    )
+
     stance_breakdown = {
         "SUPPORT": 0,
         "OPPOSE": 0,
@@ -91,7 +97,7 @@ async def get_topic(topic_id: int, db: Session = Depends(get_db)):
     }
     for stance, count in stance_counts:
         stance_breakdown[stance] = count
-    
+
     return {
         "id": topic.id,
         "name": topic.name,
@@ -102,5 +108,9 @@ async def get_topic(topic_id: int, db: Session = Depends(get_db)):
         "stance_breakdown": stance_breakdown,
         "created_at": topic.created_at.isoformat(),
         "updated_at": topic.updated_at.isoformat(),
-        "last_updated": max([c.stored_at for c in topic.comments]).isoformat() if topic.comments else None,
+        "last_updated": (
+            max([c.stored_at for c in topic.comments]).isoformat()
+            if topic.comments
+            else None
+        ),
     }

@@ -177,6 +177,14 @@ cd frontend
 npm run test
 ```
 
+Pre-commit (format + lint):
+
+```powershell
+pip install pre-commit black ruff
+python -m pre_commit install
+python -m pre_commit run --all-files
+```
+
 ---
 
 ## Troubleshooting

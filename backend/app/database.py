@@ -2,7 +2,8 @@
 Database setup and session management.
 Uses SQLAlchemy 2.0 with async support.
 """
-from sqlalchemy import create_engine, event
+
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
 from app.config import settings

@@ -2,6 +2,7 @@
 Application configuration and settings.
 Loads from environment variables.
 """
+
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -15,7 +16,9 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     # Database
-    database_url: str = "postgresql://debateuser:debatepass@localhost:5432/social_debate"
+    database_url: str = (
+        "postgresql://debateuser:debatepass@localhost:5432/social_debate"
+    )
     database_echo: bool = False
 
     # Reddit API
@@ -59,4 +62,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
-

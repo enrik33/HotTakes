@@ -119,6 +119,9 @@ FETCH_INTERVAL_MINUTES=30
 
 Full list: see `backend/.env.example`
 
+Note:
+- Do not commit `.env` files. Keep secrets local; only commit `.env.example`.
+
 ---
 
 ## Project Structure

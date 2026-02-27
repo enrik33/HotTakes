@@ -43,6 +43,7 @@ Copy-Item backend/.env.example backend/.env
 # - REDDIT_CLIENT_ID (get from https://www.reddit.com/prefs/apps)
 # - REDDIT_CLIENT_SECRET
 # - REDDIT_USER_AGENT
+# Startup validates required env vars and constraints. If invalid, the app exits with a clear error message.
 ```
 
 Initialize database (SQLite for dev):
@@ -118,6 +119,16 @@ FETCH_INTERVAL_MINUTES=30
 ```
 
 Full list: see `backend/.env.example`
+
+Validation rules enforced at startup:
+
+- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` are required and cannot be empty.
+- `DATABASE_URL` is required and must include a valid scheme (`postgresql://`, `postgres://`, `sqlite:///`).
+- `FETCH_INTERVAL_MINUTES` must be greater than `0`.
+- `MAX_COMMENTS_PER_TOPIC` must be greater than or equal to `MAX_COMMENTS_PER_FETCH`.
+- `MIN_CLUSTER_SIZE` must be greater than or equal to `2`.
+- `ENVIRONMENT` must be one of `development`, `production`, `test`.
+- `LOG_LEVEL` must be one of `debug`, `info`, `warning`, `error`, `critical`.
 
 Note:
 - Do not commit `.env` files. Keep secrets local; only commit `.env.example`.

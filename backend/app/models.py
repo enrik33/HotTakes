@@ -1,7 +1,17 @@
 """
 Database ORM models using SQLAlchemy 2.0.
 """
-from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, BigInteger, DateTime, Boolean
+
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    Float,
+    ForeignKey,
+    BigInteger,
+    DateTime,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -21,9 +31,15 @@ class Topic(Base):
 
     # Relationships
     posts = relationship("Post", back_populates="topic", cascade="all, delete-orphan")
-    comments = relationship("Comment", back_populates="topic", cascade="all, delete-orphan")
-    clusters = relationship("Cluster", back_populates="topic", cascade="all, delete-orphan")
-    daily_stats = relationship("DailyStats", back_populates="topic", cascade="all, delete-orphan")
+    comments = relationship(
+        "Comment", back_populates="topic", cascade="all, delete-orphan"
+    )
+    clusters = relationship(
+        "Cluster", back_populates="topic", cascade="all, delete-orphan"
+    )
+    daily_stats = relationship(
+        "DailyStats", back_populates="topic", cascade="all, delete-orphan"
+    )
 
 
 class Post(Base):
@@ -50,7 +66,9 @@ class Post(Base):
 
     # Relationships
     topic = relationship("Topic", back_populates="posts")
-    comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+    comments = relationship(
+        "Comment", back_populates="post", cascade="all, delete-orphan"
+    )
 
 
 class Comment(Base):
@@ -67,15 +85,27 @@ class Comment(Base):
     author_hash = Column(String(64))  # SHA256 hash of username
     score = Column(Integer, default=0)
     created_utc = Column(BigInteger, nullable=False, index=True)
-    parent_comment_id = Column(String(50))  # Reddit parent comment ID (null if reply to post)
+    parent_comment_id = Column(
+        String(50)
+    )  # Reddit parent comment ID (null if reply to post)
     permalink = Column(String(500))
     stored_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     topic = relationship("Topic", back_populates="comments")
     post = relationship("Post", back_populates="comments")
-    classification = relationship("Classification", back_populates="comment", uselist=False, cascade="all, delete-orphan")
-    embedding = relationship("Embedding", back_populates="comment", uselist=False, cascade="all, delete-orphan")
+    classification = relationship(
+        "Classification",
+        back_populates="comment",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    embedding = relationship(
+        "Embedding",
+        back_populates="comment",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class Classification(Base):
@@ -84,7 +114,9 @@ class Classification(Base):
     __tablename__ = "classifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True)
+    comment_id = Column(
+        Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True
+    )
     stance = Column(String(20), nullable=False)  # SUPPORT, OPPOSE, MIXED, NEUTRAL
     sentiment = Column(String(20), nullable=False)  # POSITIVE, NEUTRAL, NEGATIVE
     toxicity_score = Column(Float)  # 0.0–1.0
@@ -102,8 +134,12 @@ class Embedding(Base):
     __tablename__ = "embeddings"
 
     id = Column(Integer, primary_key=True, index=True)
-    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True)
-    embedding_vector = Column(String(5000))  # JSON-serialized float list (or use pgvector if using PostgreSQL)
+    comment_id = Column(
+        Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True
+    )
+    embedding_vector = Column(
+        String(5000)
+    )  # JSON-serialized float list (or use pgvector if using PostgreSQL)
     computed_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -117,11 +153,15 @@ class Cluster(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     topic_id = Column(Integer, ForeignKey("topics.id"), nullable=False, index=True)
-    stance = Column(String(20), nullable=False)  # SUPPORT, OPPOSE, MIXED, NEUTRAL (clustering within stance)
+    stance = Column(
+        String(20), nullable=False
+    )  # SUPPORT, OPPOSE, MIXED, NEUTRAL (clustering within stance)
     cluster_label = Column(Integer, nullable=False)  # KMeans cluster ID (0, 1, 2, ...)
     size = Column(Integer, default=0)  # Number of comments in cluster
     keywords = Column(String(500))  # Comma-separated keywords
-    representative_comment_id = Column(Integer, ForeignKey("comments.id"))  # Comment closest to centroid
+    representative_comment_id = Column(
+        Integer, ForeignKey("comments.id")
+    )  # Comment closest to centroid
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

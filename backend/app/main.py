@@ -1,6 +1,7 @@
 ﻿"""
 FastAPI application main entry point.
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -58,4 +59,3 @@ async def root():
         "docs": "/docs",
         "version": "1.0.0",
     }
-

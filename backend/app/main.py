@@ -6,12 +6,14 @@ from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import Base, engine
+from app.errors import STATUS_CODE_DEFAULTS, build_error_payload
 from app.logging_config import REQUEST_ID_CTX, get_logger, setup_logging
 from app.routes import clusters, comments, health, timeline, topics
 from app.tasks.scheduler import start_scheduler, stop_scheduler
@@ -131,7 +133,53 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "request_id": request_id},
+        content=build_error_payload(
+            code="INTERNAL_SERVER_ERROR",
+            message="Internal server error",
+            details=None,
+            request_id=request_id,
+        ),
+        headers={"X-Request-ID": request_id},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Normalize HTTPException responses to standard error schema."""
+    request_id = request.headers.get("X-Request-ID", REQUEST_ID_CTX.get())
+    details = None
+    code = STATUS_CODE_DEFAULTS.get(exc.status_code, "HTTP_ERROR")
+    message = str(exc.detail) if exc.detail else "HTTP error"
+
+    if isinstance(exc.detail, dict):
+        code = exc.detail.get("code", code)
+        message = exc.detail.get("message", message)
+        details = exc.detail.get("details")
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=build_error_payload(
+            code=code,
+            message=message,
+            details=details,
+            request_id=request_id,
+        ),
+        headers={"X-Request-ID": request_id},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Normalize validation errors to standard error schema."""
+    request_id = request.headers.get("X-Request-ID", REQUEST_ID_CTX.get())
+    return JSONResponse(
+        status_code=422,
+        content=build_error_payload(
+            code="VALIDATION_ERROR",
+            message="Validation error",
+            details=exc.errors(),
+            request_id=request_id,
+        ),
         headers={"X-Request-ID": request_id},
     )
 

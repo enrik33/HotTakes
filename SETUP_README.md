@@ -196,6 +196,22 @@ python -m pre_commit install
 python -m pre_commit run --all-files
 ```
 
+Database migrations (Alembic):
+
+```powershell
+cd backend
+pip install alembic
+$env:REDDIT_CLIENT_ID="your_id"
+$env:REDDIT_CLIENT_SECRET="your_secret"
+$env:REDDIT_USER_AGENT="your_user_agent"
+& "$env:APPDATA\Python\Python313\Scripts\alembic.exe" -c alembic.ini upgrade head
+```
+
+If migration fails due to duplicate external IDs, clean duplicates before rerunning:
+
+- `posts` duplicates by `(platform, external_id)`
+- `comments` duplicates by `(platform, external_id)`
+
 ---
 
 ## Troubleshooting

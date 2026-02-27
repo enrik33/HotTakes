@@ -11,6 +11,8 @@ from sqlalchemy import (
     ForeignKey,
     BigInteger,
     DateTime,
+    Index,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -61,7 +63,16 @@ class Post(Base):
     stored_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        # Unique constraint on (platform, external_id)
+        UniqueConstraint(
+            "platform",
+            "external_id",
+            name="uq_posts_platform_external_id",
+        ),
+        Index(
+            "ix_posts_topic_created_utc",
+            "topic_id",
+            "created_utc",
+        ),
     )
 
     # Relationships
@@ -91,6 +102,19 @@ class Comment(Base):
     permalink = Column(String(500))
     stored_at = Column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        UniqueConstraint(
+            "platform",
+            "external_id",
+            name="uq_comments_platform_external_id",
+        ),
+        Index(
+            "ix_comments_topic_created_utc",
+            "topic_id",
+            "created_utc",
+        ),
+    )
+
     # Relationships
     topic = relationship("Topic", back_populates="comments")
     post = relationship("Post", back_populates="comments")
@@ -114,9 +138,7 @@ class Classification(Base):
     __tablename__ = "classifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    comment_id = Column(
-        Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True
-    )
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False, index=True)
     stance = Column(String(20), nullable=False)  # SUPPORT, OPPOSE, MIXED, NEUTRAL
     sentiment = Column(String(20), nullable=False)  # POSITIVE, NEUTRAL, NEGATIVE
     toxicity_score = Column(Float)  # 0.0–1.0
@@ -126,6 +148,11 @@ class Classification(Base):
 
     # Relationships
     comment = relationship("Comment", back_populates="classification")
+
+    __table_args__ = (
+        UniqueConstraint("comment_id", name="uq_classifications_comment_id"),
+        Index("ix_classifications_stance", "stance"),
+    )
 
 
 class Embedding(Base):
@@ -192,5 +219,6 @@ class DailyStats(Base):
     topic = relationship("Topic", back_populates="daily_stats")
 
     __table_args__ = (
-        # Unique constraint on (topic_id, date)
+        UniqueConstraint("topic_id", "date", name="uq_daily_stats_topic_date"),
+        Index("ix_daily_stats_topic_date", "topic_id", "date"),
     )

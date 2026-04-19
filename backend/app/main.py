@@ -44,8 +44,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HotTakes",
-    description="Real-time analysis of Reddit debates",
-    version="1.0.0",
+    description="Real-time analysis of Hacker News tech discourse",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -187,4 +187,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "HotTakes API", "docs": "/docs", "version": "1.0.0"}
+    return {"message": "HotTakes API", "docs": "/docs", "version": "2.0.0"}

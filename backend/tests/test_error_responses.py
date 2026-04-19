@@ -6,9 +6,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
-os.environ["REDDIT_CLIENT_ID"] = "test-id"
-os.environ["REDDIT_CLIENT_SECRET"] = "test-secret"
-os.environ["REDDIT_USER_AGENT"] = "test-agent"
 os.environ["DATABASE_URL"] = "sqlite:///./test_errors.db"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["DEBUG"] = "false"

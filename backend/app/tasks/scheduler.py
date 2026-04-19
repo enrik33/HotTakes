@@ -50,10 +50,10 @@ def start_scheduler():
     """Start the background scheduler."""
     if not scheduler.running:
         scheduler.add_job(
-            lambda: _run_job("fetch_reddit", "ingestion", fetch_reddit_data),
+            lambda: _run_job("fetch_hn", "ingestion", fetch_hn_data),
             trigger=IntervalTrigger(minutes=settings.fetch_interval_minutes),
-            id="fetch_reddit",
-            name="Fetch Reddit data",
+            id="fetch_hn",
+            name="Fetch Hacker News data",
             replace_existing=True,
         )
         scheduler.add_job(
@@ -105,16 +105,16 @@ def stop_scheduler():
 
 
 # Task functions (to be implemented)
-def fetch_reddit_data():
-    """Fetch new posts and comments from Reddit."""
-    # TODO: Implement reddit_fetcher.py
+def fetch_hn_data():
+    """Fetch new stories and comments from Hacker News."""
+    # TODO: Implement HNIngestionService
     logger.info(
-        "fetch_reddit_data_stub",
+        "fetch_hn_data_stub",
         extra={
-            "event": "fetch_reddit_data_stub",
+            "event": "fetch_hn_data_stub",
             "component": "ingestion",
             "request_id": "-",
-            "job_name": "fetch_reddit",
+            "job_name": "fetch_hn",
         },
     )
 

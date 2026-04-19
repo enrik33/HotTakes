@@ -43,14 +43,14 @@ class Topic(Base):
 
 
 class Post(Base):
-    """Reddit post model."""
+    """HN story model."""
 
     __tablename__ = "posts"
 
     id = Column(Integer, primary_key=True, index=True)
     topic_id = Column(Integer, ForeignKey("topics.id"), nullable=False, index=True)
-    external_id = Column(String(50), nullable=False)  # Reddit post ID
-    platform = Column(String(20), default="reddit")
+    external_id = Column(String(50), nullable=False)  # HN item ID
+    platform = Column(String(20), default="hackernews")
     title = Column(String(500), nullable=False)
     selftext = Column(Text)
     author_hash = Column(String(64))  # SHA256 hash of username
@@ -72,22 +72,22 @@ class Post(Base):
 
 
 class Comment(Base):
-    """Reddit comment model."""
+    """HN comment model."""
 
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
     topic_id = Column(Integer, ForeignKey("topics.id"), nullable=False, index=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False, index=True)
-    external_id = Column(String(50), nullable=False)  # Reddit comment ID
-    platform = Column(String(20), default="reddit")
+    external_id = Column(String(50), nullable=False)  # HN item ID
+    platform = Column(String(20), default="hackernews")
     body = Column(Text, nullable=False)
-    author_hash = Column(String(64))  # SHA256 hash of username
+    author_hash = Column(String(64))  # SHA256 hash of HN username
     score = Column(Integer, default=0)
     created_utc = Column(BigInteger, nullable=False, index=True)
     parent_comment_id = Column(
         String(50)
-    )  # Reddit parent comment ID (null if reply to post)
+    )  # Parent HN item ID (null if direct reply to story)
     permalink = Column(String(500))
     stored_at = Column(DateTime, default=datetime.utcnow)
 

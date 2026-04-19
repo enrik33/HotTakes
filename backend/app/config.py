@@ -25,12 +25,9 @@ class Settings(BaseSettings):
     )
     database_echo: bool = False
 
-    # Reddit API
-    reddit_client_id: str
-    reddit_client_secret: str
-    reddit_user_agent: str
-    reddit_username: str = ""
-    reddit_password: str = ""
+    # Hacker News ingestion (no credentials needed — public Firebase API)
+    min_comments_threshold: int = 50  # Minimum comments for a story to be ingested
+    hn_max_depth: int = 3  # Maximum comment nesting depth to fetch
 
     # API Settings
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
@@ -97,14 +94,6 @@ class Settings(BaseSettings):
                 "DATABASE_URL scheme must be one of: postgresql, postgres, sqlite."
             )
         return value
-
-    @field_validator("reddit_client_id", "reddit_client_secret", "reddit_user_agent")
-    @classmethod
-    def validate_required_reddit_fields(cls, value: str, info) -> str:
-        if value is None or not value.strip():
-            env_name = info.field_name.upper()
-            raise ValueError(f"{env_name} is required and cannot be empty.")
-        return value.strip()
 
     @field_validator("fetch_interval_minutes")
     @classmethod

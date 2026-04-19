@@ -9,10 +9,6 @@ sqlalchemy==2.0.23
 psycopg2-binary==2.9.9  # PostgreSQL adapter
 alembic==1.12.1
 
-# Reddit API
-praw==7.7.0
-prawcore==2.4.0
-
 # Async/HTTP
 aiohttp==3.9.1
 httpx==0.25.2

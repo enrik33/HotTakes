@@ -3,14 +3,16 @@ Database ORM models using SQLAlchemy 2.0.
 """
 
 from sqlalchemy import (
+    BigInteger,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Float,
-    ForeignKey,
-    BigInteger,
-    DateTime,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -61,7 +63,10 @@ class Post(Base):
     stored_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        # Unique constraint on (platform, external_id)
+        UniqueConstraint(
+            "platform", "external_id", name="uq_posts_platform_external_id"
+        ),
+        Index("ix_posts_topic_created", "topic_id", "created_utc"),
     )
 
     # Relationships
@@ -90,6 +95,15 @@ class Comment(Base):
     )  # Parent HN item ID (null if direct reply to story)
     permalink = Column(String(500))
     stored_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "platform", "external_id", name="uq_comments_platform_external_id"
+        ),
+        # Composite indexes for the two most common query patterns
+        Index("ix_comments_topic_created", "topic_id", "created_utc"),
+        Index("ix_comments_post_created", "post_id", "created_utc"),
+    )
 
     # Relationships
     topic = relationship("Topic", back_populates="comments")
@@ -123,6 +137,12 @@ class Classification(Base):
     model_version = Column(String(50), default="v1")  # Tracking for model updates
     classified_at = Column(DateTime, default=datetime.utcnow)
     classified_by = Column(String(50), default="model")  # model, manual, rule
+
+    __table_args__ = (
+        # Supports stance-distribution queries and toxicity-by-stance aggregations
+        Index("ix_classifications_stance", "stance"),
+        Index("ix_classifications_stance_toxicity", "stance", "toxicity_score"),
+    )
 
     # Relationships
     comment = relationship("Comment", back_populates="classification")
@@ -168,7 +188,9 @@ class Cluster(Base):
     topic = relationship("Topic", back_populates="clusters")
 
     __table_args__ = (
-        # Unique constraint on (topic_id, stance, cluster_label)
+        UniqueConstraint(
+            "topic_id", "stance", "cluster_label", name="uq_clusters_topic_stance_label"
+        ),
     )
 
 
@@ -192,5 +214,5 @@ class DailyStats(Base):
     topic = relationship("Topic", back_populates="daily_stats")
 
     __table_args__ = (
-        # Unique constraint on (topic_id, date)
+        UniqueConstraint("topic_id", "date", name="uq_daily_stats_topic_date"),
     )

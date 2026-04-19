@@ -1,140 +1,271 @@
-# HotTakes
+# HotTakes — Project Specification v2.0
+### Real-Time Tech Discourse Analyser — Platform Migration & Build Plan
 
-HotTakes is a real-time debate analysis app for Reddit discussions. It ingests comments, classifies stance/sentiment/toxicity, clusters similar arguments, and serves analytics through a FastAPI backend.
+| Field | Value |
+|---|---|
+| **Author** | Enrik Tsipa |
+| **Version** | 2.0.0 |
+| **Date** | April 2026 |
+| **Status** | In Planning |
+| **Repository** | github.com/enrik33/HotTakes |
 
-## What This Repo Contains
+---
 
-- `backend/`: FastAPI API, database models, routes, scheduler, config
-- `frontend/`: frontend workspace scaffold
-- `docs/`: additional documentation (optional expansion)
-- Root docs: planning/specification and setup guides
+## 01 — Executive Summary
 
-## Current Backend Structure
+HotTakes is a full-stack debate analytics platform that ingests discussion threads from public forums, classifies each comment by argumentative stance, emotional sentiment, and toxicity level, then groups semantically similar arguments into clusters and exposes the results through a live analytics dashboard.
 
-```text
-backend/
-  app/
-    main.py
-    config.py
-    database.py
-    models.py
-    routes/
-      health.py
-      topics.py
-      comments.py
-      clusters.py
-      timeline.py
-    tasks/
-      scheduler.py
-    services/
-    schemas/
-  tests/
-  requirements.txt
-  .env.example
-  Dockerfile
-```
+Version 1.0 was designed around the Reddit API targeting `r/soccer`. Development stalled when Reddit revoked third-party API access under its 2024 developer policy changes, making ingestion legally and technically blocked.
 
-## Quick Start (PowerShell)
+> **Blocking Issue — v1.0**
+> Reddit's API policy change blocked all third-party programmatic access to public post and comment data without an approved enterprise agreement. The ingestion layer — the foundation of the entire pipeline — could not be built.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
-Copy-Item backend/.env.example backend/.env
-cd backend
-uvicorn app.main:app --reload
-```
+This document specifies the **v2.0 migration**: replacing Reddit with the **Hacker News Firebase API** as the data source, while preserving the entire backend architecture, data model, classification pipeline, and clustering logic already designed. The product scope shifts from football discourse to **technology discourse** — a better fit for the developer audience evaluating this project, and a stronger signal for job applications in the tech industry.
 
-API docs: `http://localhost:8000/docs`
+> **Strategic Value**
+> Hacker News is free, open, requires no authentication, has no rate-limit restrictions on its public API, and its audience — professional software engineers — is exactly the same audience that will read this project on a CV or in a job interview.
 
-## Docker
+---
 
-```powershell
-docker-compose up --build
-```
+## 02 — Data Source Migration: Reddit → Hacker News
 
-## Key Endpoints
+The following comparison documents the technical and strategic rationale for the migration.
 
-- `GET /health`
-- `GET /api/topics`
-- `POST /api/topics`
-- `GET /api/comments?topic_id=1`
-- `GET /api/clusters?topic_id=1`
-- `GET /api/timeline?topic_id=1`
+| | Reddit API ❌ | Hacker News API ✅ |
+|---|---|---|
+| **Endpoint** | oauth.reddit.com | hacker-news.firebaseio.com/v0 |
+| **Auth required** | Yes — OAuth 2.0 | None |
+| **Access policy** | Restricted (2024) | Fully open / Firebase |
+| **Rate limit** | 60 req/min (approved) | None documented |
+| **Cost** | Paid above threshold | Free |
+| **Legal risk** | High (ToS breach) | None |
+| **Audience** | r/soccer: football fans | Senior engineers, founders |
 
-## MVP Scope (Locked)
+The HN API exposes five primary endpoints relevant to this project: `topstories`, `newstories`, `askstories`, `showstories`, and individual item detail. Each comment (called a "kid") is a separate item with its own ID and parent reference, matching the threading model the v1.0 schema was already designed to support.
 
-- Platform ingestion: Reddit only (schema remains platform-ready for later expansion)
-- Subreddit: `r/soccer`
-- Topic focus: player performances + transfers
-- Lookback window: last 30 days
-- Target volume: 80-200 posts and 8,000-30,000 comments
-- Ingestion cadence: every 30 minutes
+> **Scope Shift**
+> The product topic changes from *football transfers and player performances* to *technology opinions and industry debates*. This means "Ask HN", controversial technical posts, and AI/startup discussions replace r/soccer transfer threads. The classification logic (stance, sentiment, toxicity) applies equally well — HN is famously opinionated.
 
-### Post Filtering (Case-Insensitive)
+---
 
-- Transfer signals: transfer, transfers, here we go, hwg, signed, signing, joins, loan, on loan, fee, release clause, contract, wages, bid, offer, agreement, medical, rumour, rumor, reported, linked, interest, deal, announcement, confirmed, official
-- Performance/decision signals: motm, man of the match, performance, form, bottled, carry job, tactics, system, lineup, selection, subs, manager, coach, sacked
-- Optional targeting rule: include posts when `(player name + transfer keyword)` is present
+## 03 — Current State Audit
 
-### Classification Policy (MVP)
+| Component | Location | Status | Notes |
+|---|---|---|---|
+| FastAPI app entrypoint | `backend/app/main.py` | ✅ Built | App initialized, CORS configured, routers registered. Carries over unchanged. |
+| Database models | `backend/app/models.py` | ✅ Built | Platform-agnostic schema with `platform` field and `author_hash`. Minimal change needed. |
+| Database connection | `backend/app/database.py` | ✅ Built | SQLAlchemy 2.0 async session factory. No changes required. |
+| Config / env | `backend/app/config.py` | ⚠️ Update needed | Remove Reddit OAuth credentials. No HN credentials needed — simpler config. |
+| API routes | `backend/app/routes/` | ✅ Built | health, topics, comments, clusters, timeline all scaffolded. Carries over. |
+| Scheduler | `backend/app/tasks/scheduler.py` | ⚠️ Stub only | APScheduler initialized. Ingestion job to be wired in Phase 2. |
+| Ingestion service | `backend/app/services/` | ❌ Not built | Reddit fetcher was never implemented. New HN fetcher to be built in Phase 2. |
+| Classification service | `backend/app/services/` | ❌ Not built | Stance, sentiment, toxicity classification stubs only. Build in Phase 3. |
+| Clustering service | `backend/app/services/` | ❌ Not built | Embedding + cosine similarity clustering. Build in Phase 4. |
+| Docker / Compose | `docker-compose.yml` | ✅ Built | PostgreSQL + app services defined. Carries over with minor env updates. |
+| Frontend dashboard | *(not created)* | ❌ Not built | React app with stance timeline, cluster view, toxicity charts. Build in Phase 5. |
+| Deployment | *(not configured)* | ❌ Not done | Railway for backend, Vercel for frontend. Phase 6. |
 
-- Stance classes: `SUPPORT`, `OPPOSE`, `MIXED`, `NEUTRAL`
-- Single-label record only (no per-aspect split in MVP)
-- Stance target is tied to post intent:
-- Transfer post: do users approve/disapprove of the transfer?
-- Performance/manager post: do users agree/disagree with the take?
-- If a comment does not reference target entities, classify as `NEUTRAL` by rule
-- Sentiment: `POSITIVE`, `NEUTRAL`, `NEGATIVE`
-- Toxicity: score `0.0-1.0` (optionally rendered as low/medium/high in UI)
+---
 
-### Clustering Policy (MVP)
+## 04 — Change Impact Analysis
 
-- Similarity = semantic similarity (embeddings + cosine distance), not keyword-only grouping
-- Cluster within stance buckets (`SUPPORT` with `SUPPORT`, etc.)
-- Target cluster count: 8-12 per stance bucket
-- UI should display largest 5-10 clusters overall
-- Per cluster output: 5-10 keywords, 1 representative quote, up to 3 top quotes
+The migration from Reddit to Hacker News is primarily a **data source swap**. The architecture, tech stack, and pipeline design are preserved in full.
 
-### Data Limits and Privacy
+### Removed / Replaced
 
-- Database: PostgreSQL for MVP (local first, cloud after pipeline is stable)
-- Keep at most 6 months data; collect last 1 month for MVP
-- Soft caps:
-- Max comments per topic: 25,000
-- Max comments per post: 1,000
-- Max comments per ingest cycle: 2,000
-- Privacy: store `author_hash`, not raw username
-- Removed/deleted comment bodies: skip content, keep metadata
+- **Reddit OAuth credentials** — removed from config entirely. No replacement needed.
+- **PRAW / aiohttp Reddit client** — replaced with simple async HTTP calls to HN Firebase API.
+- **Subreddit-based post filtering** — replaced with HN story type targeting (Ask HN, Show HN, top stories).
+- **Soccer-domain keyword lists** — transfer/performance keywords replaced with tech-domain keywords (AI, layoffs, funding, open source, etc.).
+- **r/soccer-specific stance framing** — "approve/disapprove of transfer" replaced with "agree/disagree with the technical take".
+- **PROJECT_SPECIFICATION.md v1** — superseded by this document.
 
-### Quality Gates
+### Preserved Unchanged
 
-- Hide clusters with fewer than 8 comments
-- Hide weak clusters where top quotes fail minimum length threshold (40 chars)
-- If total classified comments < 300 for a topic, show "not enough data yet" and skip clustering view
+- **FastAPI application** — entrypoint, CORS, router registration, all routes.
+- **SQLAlchemy models** — platform-agnostic schema carries over. The `platform` field simply stores `"hackernews"`.
+- **Docker Compose setup** — PostgreSQL + app services unchanged.
+- **APScheduler scaffold** — 30-minute ingestion cadence maintained.
+- **Classification policy** — stance labels (SUPPORT / OPPOSE / MIXED / NEUTRAL), sentiment, toxicity scoring.
+- **Clustering policy** — embedding cosine similarity, 8–12 clusters per stance bucket, quality gates (<8 comments, <40 char quotes).
+- **All API route contracts** — `/topics`, `/comments`, `/clusters`, `/timeline` unchanged.
+- **Privacy policy** — `author_hash` instead of raw usernames, retained.
 
-### MVP UI Priorities
+---
 
-- Top arguments (cluster summaries + quotes)
-- Timeline (stance percentage over time)
-- Toxicity trend and toxicity-by-stance
-- Optional extra: word clouds
-- Deferred to v2: multi-subreddit heatmaps, reply-chain network graphs, websockets/live push
+## 05 — Technology Stack
 
-## Starter Bootstrap Script
+Items marked `[NEW]` are additions for v2.0. Items marked `[REMOVED]` are eliminated.
 
-Use `STARTER_BOOTSTRAP.ps1` to generate missing MVP starter files (service/task stubs, MVP scope constants, and env template) in a fresh clone.
+### Data Ingestion
+`HN Firebase API [NEW]` `aiohttp` `APScheduler` ~~`PRAW (Reddit) [REMOVED]`~~ ~~`OAuth 2.0 [REMOVED]`~~
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\STARTER_BOOTSTRAP.ps1
-```
+### Backend API
+`FastAPI` `SQLAlchemy 2.0` `Pydantic v2` `Uvicorn`
 
-## Documentation
+### Database
+`PostgreSQL` `asyncpg` `Alembic`
 
-- `SETUP_README.md`: detailed setup and troubleshooting
-- `PROJECT_SPECIFICATION.md`: full project scope and implementation plan
-- `PHASE_0_CHECKLIST.md`: execution checklist
+### NLP / Classification
+`sentence-transformers [NEW]` `Detoxify [NEW]` `scikit-learn` `TextBlob`
 
-## Status
+### Frontend
+`React 18` `TypeScript` `TanStack Query` `Recharts` `Tailwind CSS`
 
-MVP scaffold is in place; data pipeline, classifier, clustering services, and frontend implementation are the next build phases.
+### Infra & Deployment
+`Docker` `Docker Compose` `Railway [NEW]` `Vercel [NEW]` `GitHub Actions [NEW]`
+
+---
+
+## 06 — Implementation Plan
+
+### Phase 01 — Repository Cleanup & Data Source Wiring
+**Duration:** ~2 days
+
+**Tasks:**
+- Delete all Reddit-related code, credentials, and config references from the codebase
+- Update `.env.example` — remove Reddit OAuth vars, no HN credentials needed
+- Write and test a minimal **HN API client** — fetch top stories, item detail, and child comments by ID
+- Verify comment tree traversal (HN nests comments as "kids" arrays recursively)
+- Update `PROJECT_SPECIFICATION.md` — archive v1.0, link this document as v2.0
+- Update `README.md` with new product description and quick-start instructions
+- Confirm Docker + PostgreSQL stack starts cleanly locally
+
+**Key Decisions:**
+- **Story types to target:** "Ask HN" threads, "Show HN" posts, and top stories with ≥50 comments
+- **Keyword filter approach:** title-based keyword matching on ingestion, same pattern as v1.0 soccer keywords
+- **Comment depth limit:** fetch max 3 levels of reply nesting to control volume
+
+**Deliverable:** Docker Compose starts, HN API client fetches a real story and its comments successfully, no Reddit references remain in the codebase, documentation updated.
+
+---
+
+### Phase 02 — Ingestion Pipeline
+**Duration:** ~4 days
+
+**Tasks:**
+- Implement **HNIngestionService** — fetches top/ask/show story IDs, filters by keyword list and comment count threshold
+- Implement **comment tree fetcher** — recursively resolves kid IDs to comment objects, respects depth limit
+- Implement **database writer** — upserts stories as Topics, comments as Comments; deduplication by external HN item ID
+- Apply **author privacy** — hash HN usernames with SHA-256 before storage, never store raw
+- Wire the ingestion service into the **APScheduler job** at 30-minute interval
+- Add **volume caps**: max 25,000 comments per topic, max 1,000 per story, max 2,000 per fetch cycle
+- Write **integration tests** against the live HN API using real story IDs
+
+**Tech-Domain Keyword List:**
+- **AI/ML:** LLM, GPT, Claude, Gemini, AI, machine learning, neural, model
+- **Industry:** layoffs, funding, acquisition, IPO, startup, valuation, fired
+- **Open source:** open source, license, fork, maintainer, abandoned
+- **Engineering:** performance, scaling, rewrite, architecture, security breach, outage
+- **Opinion triggers:** "Ask HN: should we…", "Is X dead?", "Why does X suck?"
+
+**Deliverable:** Scheduler runs every 30 minutes. After one cycle, database contains real HN stories and comments. Volume caps enforced. Author usernames are hashed. Confirmed via `GET /api/topics` returning live data.
+
+---
+
+### Phase 03 — Classification Pipeline
+**Duration:** ~5 days
+
+**Tasks:**
+- Implement **StanceClassifier** — zero-shot classification using a sentence-transformers model (e.g. `cross-encoder/nli-deberta-v3-small`) against topic-derived hypothesis pairs
+- Implement **SentimentClassifier** — TextBlob or HuggingFace distilbert-sentiment for POSITIVE / NEUTRAL / NEGATIVE labels
+- Implement **ToxicityScorer** — Detoxify library returns a 0.0–1.0 float score per comment
+- Build **ClassificationService** that runs all three in sequence per comment, writes results back to the comments table
+- Wire classification as a **post-ingestion step** — triggered after each ingestion cycle, processes only unclassified comments
+- Build a **manual labelling script** for at least 200 comments — output CSV used to validate model accuracy before deployment
+- Define quality gate: skip clustering if fewer than 300 classified comments exist for a topic
+
+**Stance Logic for HN:**
+- For **opinion/ask threads:** stance relative to the parent post's position (agree vs. disagree with the take)
+- For **news threads:** stance relative to the entity or event (support vs. oppose the layoff, acquisition, etc.)
+- Comments that don't reference the thread subject → auto-label **NEUTRAL**
+- Short comments under 15 words → classify but flag as low-confidence
+
+**Deliverable:** Every comment in the database has a stance, sentiment, and toxicity score. `GET /api/comments?topic_id=X` returns classification fields. Manual validation shows ≥70% stance accuracy on labeled sample.
+
+---
+
+### Phase 04 — Clustering & Analytics Aggregation
+**Duration:** ~4 days
+
+**Tasks:**
+- Implement **EmbeddingService** — generate sentence embeddings using `all-MiniLM-L6-v2`, store as a float array column in PostgreSQL
+- Implement **ClusteringService** — KMeans on cosine-normalized embeddings, grouped within stance buckets; target 8–12 clusters per bucket
+- Per cluster: extract **5–10 keywords** (TF-IDF within cluster), select **1 representative quote** (centroid-nearest comment), surface **top 3 quotes** by upvote score
+- Implement **quality gates**: suppress clusters with fewer than 8 comments; drop quotes under 40 characters
+- Build **timeline aggregation query**: stance percentage breakdown per 6-hour bucket over last 30 days
+- Build **toxicity aggregation query**: average toxicity score by stance label and by time window
+- Wire cluster and timeline data into existing `/api/clusters` and `/api/timeline` routes
+
+**Output per Cluster:**
+- `cluster_id`, `stance_label`, `comment_count`
+- `keywords[]` — top 5–10 descriptive phrases
+- `representative_quote` — closest comment to cluster centroid
+- `top_quotes[]` — up to 3 highest-score comments in cluster
+- `avg_toxicity`, `avg_sentiment` — numeric aggregates
+
+**Deliverable:** `GET /api/clusters?topic_id=X` returns grouped argument clusters with keywords and quotes. `GET /api/timeline?topic_id=X` returns stance percentages over time. All quality gates enforced.
+
+---
+
+### Phase 05 — Frontend Dashboard
+**Duration:** ~6 days
+
+**Views & Components:**
+- **Topic List** — browse ingested HN threads, sorted by activity; search by keyword
+- **Topic Detail — Argument Clusters** — tabbed by stance (SUPPORT / OPPOSE / MIXED); each cluster shows keywords, representative quote, and top comments
+- **Stance Timeline Chart** — stacked area or line chart of stance percentages over time using Recharts
+- **Toxicity Dashboard** — toxicity trend line + toxicity-by-stance breakdown
+- **Comment Explorer** — filterable table of comments with stance, sentiment, toxicity columns
+- **Not Enough Data** — graceful empty state when classified comments < 300
+
+**Technical Requirements:**
+- React 18 + TypeScript, Tailwind CSS for styling
+- TanStack Query for all data fetching with 5-minute polling interval
+- React Router for topic list → detail navigation
+- Fully **responsive** — desktop and mobile layouts
+- Loading skeletons and error boundaries on all data-fetching components
+- No authentication required — read-only public dashboard
+
+**Deliverable:** React app running locally, consuming live backend data. All five views functional. Responsive on mobile. No console errors. Connected to the deployed backend URL.
+
+---
+
+### Phase 06 — Deployment & Public Launch
+**Duration:** ~2 days
+
+**Tasks:**
+- Deploy **PostgreSQL + FastAPI backend** to Railway — configure environment variables, health check endpoint, persistent volume for DB
+- Deploy **React frontend** to Vercel — set API base URL env var pointing to Railway backend
+- Set up **GitHub Actions CI** — run backend tests on every push to main; block merge on failure
+- Configure **automatic deployment** — Railway deploys on push to main; Vercel deploys on push to main
+- Seed the database with **≥3 real HN threads** with sufficient comment volume to demonstrate clustering
+- Update **README** with live URL, architecture diagram, and 3–4 dashboard screenshots
+- Add **live demo link** to GitHub repository description
+
+**Deployment Targets:**
+- **Backend:** Railway free tier — FastAPI + PostgreSQL, persistent, always-on
+- **Frontend:** Vercel — automatic HTTPS, global CDN, preview deployments per PR
+- **CI:** GitHub Actions — pytest on backend, TypeScript type-check on frontend
+- **Monitoring:** Railway logs + FastAPI `/health` endpoint returning uptime and last ingestion timestamp
+
+**Deliverable:** Live public URL accessible to anyone. Backend scheduler running in production. Frontend showing real HN data. README has screenshots and architecture overview. GitHub repo description has the live link.
+
+---
+
+## 07 — Definition of Done
+
+The project is considered complete when every criterion below is verifiable by a third party visiting the public URL with no setup required.
+
+- [ ] **Live URL exists.** The application is publicly accessible at a stable URL with no login required.
+- [ ] **Real data is visible.** At least 3 HN threads are fully ingested with classified comments and rendered clusters.
+- [ ] **Clustering works end-to-end.** Each topic shows at least 2 populated stance clusters with keywords and representative quotes.
+- [ ] **Timeline chart is populated.** Stance percentage over time is visible and updates with new ingestion cycles.
+- [ ] **Scheduler is running in production.** The `/health` endpoint returns a last-ingestion timestamp updated within the last hour.
+- [ ] **CI passes.** GitHub Actions green on main. Backend tests and frontend type-check both pass.
+- [ ] **README is complete.** Live URL, architecture diagram, and screenshots are present. Any developer can run it locally in under 10 minutes.
+- [ ] **Privacy is enforced.** No raw HN usernames are stored anywhere in the database. `author_hash` only.
+
+---
+
+*HotTakes v2.0 — Project Specification — Enrik Tsipa — April 2026 — github.com/enrik33/HotTakes*

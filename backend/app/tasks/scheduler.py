@@ -64,6 +64,7 @@ def start_scheduler():
             id="classify",
             name="Classify comments",
             replace_existing=True,
+            max_instances=1,
         )
         scheduler.add_job(
             lambda: _run_job("cluster", "clustering", cluster_arguments),
@@ -111,16 +112,14 @@ def stop_scheduler():
 
 def classify_comments():
     """Classify unclassified comments."""
-    # TODO: Implement classifier.py
-    logger.info(
-        "classify_comments_stub",
-        extra={
-            "event": "classify_comments_stub",
-            "component": "classification",
-            "request_id": "-",
-            "job_name": "classify",
-        },
-    )
+    from app.database import SessionLocal  # noqa: PLC0415
+    from app.tasks.classify_job import run_classify_job  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        run_classify_job(db)
+    finally:
+        db.close()
 
 
 def cluster_arguments():

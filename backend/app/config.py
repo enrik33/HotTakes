@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     toxicity_model: str = "toxigen/roberta-large-toxic-comments"
     sentiment_model: str = "distilbert-base-uncased-finetuned-sst-2-english"
+    stance_classifier_model: str = "cross-encoder/nli-deberta-v3-small"
 
     # Clustering
     n_clusters_per_stance: int = 10  # Target clusters per stance

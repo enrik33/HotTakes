@@ -60,6 +60,7 @@ class Post(Base):
     created_utc = Column(BigInteger, nullable=False)
     permalink = Column(String(500))
     last_processed_utc = Column(BigInteger)  # Last time we fetched comments for this
+    target_terms = Column(String(500))  # Comma-separated entities for stance-gating
     stored_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (

@@ -107,16 +107,42 @@ def stop_scheduler():
 # Task functions (to be implemented)
 def fetch_hn_data():
     """Fetch new stories and comments from Hacker News."""
-    # TODO: Implement HNIngestionService
-    logger.info(
-        "fetch_hn_data_stub",
-        extra={
-            "event": "fetch_hn_data_stub",
-            "component": "ingestion",
-            "request_id": "-",
-            "job_name": "fetch_hn",
-        },
-    )
+    import asyncio
+
+    from app.database import SessionLocal
+    from app.services.hn_client import HNClient
+    from app.services.hn_ingestion import HNIngestionService
+
+    async def _run() -> None:
+        db = SessionLocal()
+        try:
+            async with HNClient() as client:
+                service = HNIngestionService(db=db, client=client)
+                result = await service.run()
+                logger.info(
+                    "fetch_hn_complete",
+                    extra={
+                        "event": "fetch_hn_complete",
+                        "component": "ingestion",
+                        "request_id": "-",
+                        "job_name": "fetch_hn",
+                        **result,
+                    },
+                )
+        except Exception:
+            logger.exception(
+                "fetch_hn_error",
+                extra={
+                    "event": "fetch_hn_error",
+                    "component": "ingestion",
+                    "request_id": "-",
+                    "job_name": "fetch_hn",
+                },
+            )
+        finally:
+            db.close()
+
+    asyncio.run(_run())
 
 
 def classify_comments():

@@ -49,8 +49,10 @@ def _run_job(job_name: str, component: str, fn):
 def start_scheduler():
     """Start the background scheduler."""
     if not scheduler.running:
+        from app.tasks.fetch_job import run_fetch_job
+
         scheduler.add_job(
-            lambda: _run_job("fetch_hn", "ingestion", fetch_hn_data),
+            lambda: _run_job("fetch_hn", "ingestion", run_fetch_job),
             trigger=IntervalTrigger(minutes=settings.fetch_interval_minutes),
             id="fetch_hn",
             name="Fetch Hacker News data",
@@ -105,44 +107,6 @@ def stop_scheduler():
 
 
 # Task functions (to be implemented)
-def fetch_hn_data():
-    """Fetch new stories and comments from Hacker News."""
-    import asyncio
-
-    from app.database import SessionLocal
-    from app.services.hn_client import HNClient
-    from app.services.hn_ingestion import HNIngestionService
-
-    async def _run() -> None:
-        db = SessionLocal()
-        try:
-            async with HNClient() as client:
-                service = HNIngestionService(db=db, client=client)
-                result = await service.run()
-                logger.info(
-                    "fetch_hn_complete",
-                    extra={
-                        "event": "fetch_hn_complete",
-                        "component": "ingestion",
-                        "request_id": "-",
-                        "job_name": "fetch_hn",
-                        **result,
-                    },
-                )
-        except Exception:
-            logger.exception(
-                "fetch_hn_error",
-                extra={
-                    "event": "fetch_hn_error",
-                    "component": "ingestion",
-                    "request_id": "-",
-                    "job_name": "fetch_hn",
-                },
-            )
-        finally:
-            db.close()
-
-    asyncio.run(_run())
 
 
 def classify_comments():

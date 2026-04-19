@@ -26,11 +26,21 @@ from app.services.keyword_filter import extract_target_entities, story_matches_s
 
 logger = logging.getLogger(__name__)
 
-_STORY_TYPES = [StoryType.TOP, StoryType.ASK, StoryType.SHOW]
+_ALL_STORY_TYPES = [StoryType.TOP, StoryType.ASK, StoryType.SHOW]
 
 # Number of candidate story IDs fetched per story-type per cycle.
 # Each candidate requires one API call to read its metadata (title, descendants).
 MAX_CANDIDATES_PER_TYPE = 100
+
+
+def _active_story_types() -> list[StoryType]:
+    """Return story types enabled in settings."""
+    mapping = [
+        (app_settings.enable_top_stories, StoryType.TOP),
+        (app_settings.enable_ask_hn, StoryType.ASK),
+        (app_settings.enable_show_hn, StoryType.SHOW),
+    ]
+    return [st for enabled, st in mapping if enabled]
 
 
 def _utcnow_ts() -> int:
@@ -44,6 +54,7 @@ class IngestionResult:
         self.stories_fetched: int = 0
         self.stories_ingested: int = 0
         self.comments_ingested: int = 0
+        self.comments_skipped: int = 0  # Deleted/dead/empty items skipped
         self.cycle_cap_reached: bool = False
 
     def to_dict(self) -> dict:
@@ -51,6 +62,7 @@ class IngestionResult:
             "stories_fetched": self.stories_fetched,
             "stories_ingested": self.stories_ingested,
             "comments_ingested": self.comments_ingested,
+            "comments_skipped": self.comments_skipped,
             "cycle_cap_reached": self.cycle_cap_reached,
         }
 
@@ -62,12 +74,13 @@ class HNIngestionService:
         self.db = db
         self.client = client
         self._cycle_comment_count: int = 0  # Running total for this cycle
+        self._result: IngestionResult = IngestionResult()
 
     async def run(self) -> dict:
         """Run one full ingestion cycle (top + ask + show stories)."""
-        result = IngestionResult()
+        result = self._result
 
-        for story_type in _STORY_TYPES:
+        for story_type in _active_story_types():
             if self._cycle_comment_count >= app_settings.max_comments_per_fetch:
                 result.cycle_cap_reached = True
                 break
@@ -247,6 +260,7 @@ class HNIngestionService:
 
         for item in items:
             if item is None:
+                self._result.comments_skipped += 1
                 continue
             if item.get("type") != "comment":
                 continue
@@ -282,6 +296,7 @@ class HNIngestionService:
         external_id = str(item["id"])
         body = item.get("text") or ""
         if not body.strip():
+            self._result.comments_skipped += 1
             return None
 
         existing = (

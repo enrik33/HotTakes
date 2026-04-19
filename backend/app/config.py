@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     min_comments_threshold: int = 50  # Minimum comments for a story to be ingested
     hn_max_depth: int = 3  # Maximum comment nesting depth to fetch
 
+    # Story type toggles — each type can be independently enabled/disabled
+    enable_top_stories: bool = True
+    enable_ask_hn: bool = True
+    enable_show_hn: bool = True
+
     # API Settings
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
     api_title: str = "HotTakes"

@@ -504,3 +504,164 @@ class TestHNIngestionService:
 
         stored = db.query(Comment).first()
         assert stored.author_hash is None
+
+    # -----------------------------------------------------------------------
+    # Issue #10 — story-type config flags
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_top_stories_disabled_skips_top_stories(self, db, monkeypatch):
+        """With enable_top_stories=False, top stories must not be ingested."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_top_stories", False
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_ask_hn", False
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_show_hn", False
+        )
+
+        story = _make_story(item_id=20001, descendants=100)
+        client = MockHNClient(
+            story_ids={StoryType.TOP: [20001], StoryType.ASK: [], StoryType.SHOW: []},
+            items={20001: story},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["stories_ingested"] == 0
+        assert db.query(Topic).count() == 0
+
+    @pytest.mark.asyncio
+    async def test_only_ask_hn_enabled(self, db, monkeypatch):
+        """With only enable_ask_hn=True, only Ask HN threads are fetched."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_top_stories", False
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_ask_hn", True
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_show_hn", False
+        )
+
+        top_story = _make_story(item_id=21001, descendants=100)
+        ask_story = _make_story(
+            item_id=21002,
+            title="Ask HN: Is Rust worth learning?",
+            descendants=80,
+        )
+        client = MockHNClient(
+            story_ids={
+                StoryType.TOP: [21001],
+                StoryType.ASK: [21002],
+                StoryType.SHOW: [],
+            },
+            items={21001: top_story, 21002: ask_story},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["stories_ingested"] == 1
+        topic = db.query(Topic).first()
+        assert topic is not None
+        assert "Ask HN" in topic.name
+
+    @pytest.mark.asyncio
+    async def test_only_show_hn_enabled(self, db, monkeypatch):
+        """With only enable_show_hn=True, only Show HN threads are fetched."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_top_stories", False
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_ask_hn", False
+        )
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.enable_show_hn", True
+        )
+
+        show_story = _make_story(
+            item_id=22001,
+            title="Show HN: My open source Rust HTTP server",
+            descendants=60,
+        )
+        client = MockHNClient(
+            story_ids={
+                StoryType.TOP: [],
+                StoryType.ASK: [],
+                StoryType.SHOW: [22001],
+            },
+            items={22001: show_story},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["stories_ingested"] == 1
+
+    # -----------------------------------------------------------------------
+    # Issue #14 — deleted/dead comment handling
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_deleted_comment_is_skipped_and_counted(self, db, monkeypatch):
+        """None items from the client (deleted/dead) increment comments_skipped."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+
+        story = _make_story(item_id=30001, kids=[30002, 30003], descendants=80)
+        real_comment = _make_comment(30003, parent=30001)
+        # 30002 simulates a deleted item (client returns None for it)
+        client = MockHNClient(
+            story_ids={StoryType.TOP: [30001], StoryType.ASK: [], StoryType.SHOW: []},
+            items={30001: story, 30002: None, 30003: real_comment},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["comments_ingested"] == 1
+        assert result["comments_skipped"] >= 1
+        assert db.query(Comment).count() == 1
+
+    @pytest.mark.asyncio
+    async def test_all_deleted_comments_no_crash(self, db, monkeypatch):
+        """Ingestion completes cleanly even when all kids are deleted/dead."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+
+        story = _make_story(item_id=31001, kids=[31002, 31003], descendants=80)
+        client = MockHNClient(
+            story_ids={StoryType.TOP: [31001], StoryType.ASK: [], StoryType.SHOW: []},
+            items={31001: story, 31002: None, 31003: None},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["stories_ingested"] == 1
+        assert result["comments_ingested"] == 0
+        assert result["comments_skipped"] == 2
+        assert db.query(Comment).count() == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_body_comment_counted_as_skipped(self, db, monkeypatch):
+        """Whitespace-only comments are counted in comments_skipped."""
+        monkeypatch.setattr(
+            "app.services.hn_ingestion.app_settings.min_comments_threshold", 5
+        )
+
+        story = _make_story(item_id=32001, kids=[32002], descendants=80)
+        comment = _make_comment(32002, text="   ", parent=32001)
+        client = MockHNClient(
+            story_ids={StoryType.TOP: [32001], StoryType.ASK: [], StoryType.SHOW: []},
+            items={32001: story, 32002: comment},
+        )
+        result = await HNIngestionService(db=db, client=client).run()
+
+        assert result["comments_ingested"] == 0
+        assert result["comments_skipped"] >= 1

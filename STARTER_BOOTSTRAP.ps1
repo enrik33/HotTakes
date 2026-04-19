@@ -44,16 +44,17 @@ Write-IfMissing "backend/app/services/mvp_scope.py" @'
 HotTakes MVP scope constants.
 """
 
-MVP_SUBREDDIT = "soccer"
-MVP_TOPIC_DESCRIPTION = "Player performances + transfers in r/soccer"
+HN_STORY_TYPES = ("top", "ask", "show")
+MVP_TOPIC_DESCRIPTION = "Tech discourse on Hacker News (Ask HN, Show HN, top stories)"
 MVP_HISTORY_DAYS = 30
 
-TARGET_POSTS_MIN = 80
-TARGET_POSTS_MAX = 200
-TARGET_COMMENTS_MIN = 8000
+TARGET_STORIES_MIN = 50
+TARGET_STORIES_MAX = 200
+TARGET_COMMENTS_MIN = 5000
 TARGET_COMMENTS_MAX = 30000
 
 FETCH_INTERVAL_MINUTES = 30
+MIN_COMMENTS_THRESHOLD = 50  # Minimum HN story comment count to ingest
 
 STANCE_LABELS = ("SUPPORT", "OPPOSE", "MIXED", "NEUTRAL")
 SENTIMENT_LABELS = ("POSITIVE", "NEUTRAL", "NEGATIVE")
@@ -71,53 +72,50 @@ TARGET_CLUSTERS_PER_STANCE_MAX = 12
 TOP_QUOTES_PER_CLUSTER = 3
 MAX_UI_CLUSTERS = 10
 
-TRANSFER_KEYWORDS = [
-    "transfer",
-    "transfers",
-    "here we go",
-    "hwg",
-    "signed",
-    "signing",
-    "joins",
-    "loan",
-    "on loan",
-    "fee",
-    "release clause",
-    "contract",
-    "wages",
-    "bid",
-    "offer",
-    "agreement",
-    "medical",
-    "rumour",
-    "rumor",
-    "reported",
-    "linked",
-    "interest",
-    "deal",
-    "announcement",
-    "confirmed",
-    "official",
+AI_ML_KEYWORDS = [
+    "llm",
+    "gpt",
+    "claude",
+    "gemini",
+    "openai",
+    "anthropic",
+    "deep learning",
+    "neural network",
+    "machine learning",
+    "ai",
+    "artificial intelligence",
+    "fine-tuning",
+    "inference",
+    "alignment",
+    "safety",
+    "agent",
+    "rag",
+    "transformer",
+    "model",
 ]
 
-PERFORMANCE_KEYWORDS = [
-    "motm",
-    "man of the match",
+INDUSTRY_KEYWORDS = [
+    "layoffs",
+    "funding",
+    "acquisition",
+    "ipo",
+    "startup",
+    "valuation",
+    "fired",
+    "open source",
+    "license",
+    "fork",
+    "maintainer",
+    "abandoned",
+    "rewrite",
+    "architecture",
+    "outage",
+    "security breach",
     "performance",
-    "form",
-    "bottled",
-    "carry job",
-    "tactics",
-    "system",
-    "lineup",
-    "selection",
-    "subs",
-    "manager",
-    "coach",
-    "sacked",
+    "scaling",
 ]
 
-DEFAULT_TOPIC_KEYWORDS = TRANSFER_KEYWORDS + PERFORMANCE_KEYWORDS
+DEFAULT_TOPIC_KEYWORDS = AI_ML_KEYWORDS + INDUSTRY_KEYWORDS
 '@
 
 Write-IfMissing "backend/app/services/targeting.py" @'
@@ -132,9 +130,9 @@ def _normalize(text: str) -> str:
     return (text or "").strip().lower()
 
 
-def post_matches_scope(title: str, selftext: str, extra_terms: list[str] | None = None) -> bool:
-    """Case-insensitive keyword match for post intake."""
-    haystack = f"{_normalize(title)} {_normalize(selftext)}"
+def story_matches_scope(title: str, text: str, extra_terms: list[str] | None = None) -> bool:
+    """Case-insensitive keyword match for HN story intake."""
+    haystack = f"{_normalize(title)} {_normalize(text)}"
     keywords = DEFAULT_TOPIC_KEYWORDS + (extra_terms or [])
     return any(term.lower() in haystack for term in keywords)
 
@@ -158,17 +156,16 @@ def default_stance_for_off_target_comment(comment_text: str, target_terms: list[
 
 Write-IfMissing "backend/app/tasks/fetch_job.py" @'
 """
-Periodic Reddit fetch job (MVP skeleton).
+Periodic HN fetch job (MVP skeleton).
 """
 
 from app.config import settings
-from app.services.mvp_scope import MVP_SUBREDDIT
 
 
 def run_fetch_job() -> None:
-    # TODO: wire app.services.reddit_fetcher implementation
+    # TODO: wire app.services.hn_client implementation
     print(
-        f"[fetch_job] subreddit=r/{MVP_SUBREDDIT} "
+        f"[fetch_job] source=hacker_news "
         f"interval={settings.fetch_interval_minutes}m "
         f"history_days={settings.history_days}"
     )
@@ -206,9 +203,9 @@ DEBUG=true
 DATABASE_URL=postgresql://debateuser:debatepass@localhost:5432/social_debate
 DATABASE_ECHO=false
 
-REDDIT_CLIENT_ID=replace_me
-REDDIT_CLIENT_SECRET=replace_me
-REDDIT_USER_AGENT=HotTakesBot/1.0 (by u/replace_me)
+# Hacker News API — no credentials required (public Firebase API)
+MIN_COMMENTS_THRESHOLD=50
+HN_MAX_DEPTH=3
 
 SCHEDULER_ENABLED=true
 FETCH_INTERVAL_MINUTES=30
@@ -243,7 +240,7 @@ def test_cluster_gates():
 Write-Host ""
 Write-Host "Done. Next steps:"
 Write-Host "1) Review generated files."
-Write-Host "2) Copy backend/.env.mvp.example to backend/.env and set Reddit credentials."
+Write-Host "2) Copy backend/.env.mvp.example to backend/.env and update settings as needed."
 Write-Host "3) Start API: cd backend; uvicorn app.main:app --reload"
 Write-Host ""
 Write-Host "Tip: pass -Force to overwrite generated files."

@@ -39,10 +39,8 @@ Configure environment:
 
 ```powershell
 Copy-Item backend/.env.example backend/.env
-# Edit backend/.env and fill in:
-# - REDDIT_CLIENT_ID (get from https://www.reddit.com/prefs/apps)
-# - REDDIT_CLIENT_SECRET
-# - REDDIT_USER_AGENT
+# No credentials required — HotTakes uses the public Hacker News Firebase API.
+# Edit backend/.env to adjust DATABASE_URL or scheduler settings if needed.
 # Startup validates required env vars and constraints. If invalid, the app exits with a clear error message.
 ```
 
@@ -79,7 +77,7 @@ npm run dev
 Requires Docker & Docker Compose.
 
 ```powershell
-# Ensure backend/.env exists with Reddit credentials
+# No credentials required — HotTakes uses the public Hacker News Firebase API
 # Start all services
 docker-compose up -d
 
@@ -110,9 +108,9 @@ Create `backend/.env`:
 ENVIRONMENT=development
 DATABASE_URL=sqlite:///./social_debate.db
 
-REDDIT_CLIENT_ID=your_id
-REDDIT_CLIENT_SECRET=your_secret
-REDDIT_USER_AGENT=HotTakesBot/1.0 (by u/your_username)
+# Hacker News API — no credentials required
+MIN_COMMENTS_THRESHOLD=50
+HN_MAX_DEPTH=3
 
 SCHEDULER_ENABLED=true
 FETCH_INTERVAL_MINUTES=30
@@ -122,7 +120,6 @@ Full list: see `backend/.env.example`
 
 Validation rules enforced at startup:
 
-- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` are required and cannot be empty.
 - `DATABASE_URL` is required and must include a valid scheme (`postgresql://`, `postgres://`, `sqlite:///`).
 - `FETCH_INTERVAL_MINUTES` must be greater than `0`.
 - `MAX_COMMENTS_PER_TOPIC` must be greater than or equal to `MAX_COMMENTS_PER_FETCH`.
@@ -204,10 +201,11 @@ Database error "no such table":
 
 - Delete local SQLite DB file and restart API.
 
-Reddit API 401:
+HN API returns unexpected data:
 
-- Verify `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` in `backend/.env`.
-- Confirm app configuration at `https://www.reddit.com/prefs/apps`.
+- The HN Firebase API is public and requires no credentials.
+- Check `MIN_COMMENTS_THRESHOLD` and `HN_MAX_DEPTH` in `backend/.env`.
+- Inspect ingestion logs: `docker-compose logs -f backend`
 
 Frontend cannot connect to API:
 
@@ -223,7 +221,7 @@ Port already in use:
 
 ## Next Steps
 
-1. Implement data fetcher (`backend/app/services/reddit_fetcher.py`)
+1. Implement HN ingestion service (`backend/app/services/hn_ingestion.py`)
 2. Implement classification (`backend/app/services/classifier.py`)
 3. Implement clustering + analytics
 4. Build frontend dashboard

@@ -1,176 +1,160 @@
-﻿# HotTakes - MVP Project Specification
+﻿# HotTakes — Project Specification v2.0
+### Real-Time Tech Discourse Analyser
+
+| Field | Value |
+|---|---|
+| **Author** | Enrik Tsipa |
+| **Version** | 2.0.0 |
+| **Status** | In Progress |
+| **Repository** | github.com/enrik33/HotTakes |
+
+---
 
 ## 1. Product Goal
 
-HotTakes analyzes debate patterns in `r/soccer` and turns large comment streams into readable argument summaries.
+HotTakes is a full-stack debate analytics platform that ingests discussion threads from Hacker News, classifies each comment by argumentative stance, emotional sentiment, and toxicity level, then groups semantically similar arguments into clusters and exposes the results through a live analytics dashboard.
 
-MVP goals:
+v2.0 targets **tech discourse** — AI/ML debates, startup news, engineering opinion threads — replacing the v1.0 r/soccer scope that was blocked by Reddit's 2024 API policy changes.
 
-- ingest relevant posts/comments
-- classify stance/sentiment/toxicity
-- cluster semantically similar arguments
-- expose API for timeline and top-argument views
+---
 
-## 2. Scope
+## 2. Data Source
 
-- Platform (MVP): Reddit only
-- Subreddit: `r/soccer`
-- Topic domain: player performances + transfers
-- History window: 30 days
-- Update interval: every 30 minutes
+- **Platform:** Hacker News Firebase API (public, no authentication, no rate limits)
+- **Base URL:** `https://hacker-news.firebaseio.com/v0/`
+- **Story types ingested:** top stories, Ask HN, Show HN
+- **Story filter:** title keyword match + minimum 50 comments
+- **Comment depth limit:** 3 levels of reply nesting
+- **Update interval:** every 30 minutes
 
-Target volume:
+Target volume per active topic:
 
-- posts: 80-200
-- comments: 8,000-30,000
+- stories: 50–200
+- comments: 5,000–30,000
 
-## 3. Ingestion Rules
+---
 
-Post matching is case-insensitive title/selftext matching.
+## 3. Tech-Domain Keyword List
 
-Transfer keywords:
+**AI/ML:** LLM, GPT, Claude, Gemini, AI, machine learning, neural network, model, fine-tuning, inference, alignment, safety, agent, RAG, transformer
 
-- transfer, transfers, here we go, hwg
-- signed, signing, joins, loan, on loan
-- fee, release clause, contract, wages
-- bid, offer, agreement, medical
-- rumour, rumor, reported, linked, interest
-- deal, announcement, confirmed, official
+**Industry:** layoffs, funding, acquisition, IPO, startup, valuation, fired, open source, license, fork, maintainer, abandoned
 
-Performance/manager keywords:
+**Engineering:** performance, scaling, rewrite, architecture, security breach, outage
 
-- motm, man of the match
-- performance, form, bottled, carry job
-- tactics, system, lineup, selection, subs
-- manager, coach, sacked
+---
 
-Optional rule:
+## 4. Data Model
 
-- include posts if `(player name + transfer keyword)` matches
+Platform-agnostic schema — `platform` field stores `"hackernews"`.
 
-## 4. Data Model Constraints
+Stored per comment:
 
-MVP remains Reddit-only while schema is expansion-ready.
-
-Store:
-
-- `platform`
-- `external_id`
-- `permalink`
-- `created_utc`
-- `author_hash` (no raw usernames)
-- parent relationships for comment threading
+- `platform`, `external_id` (HN item ID)
+- `created_utc`, `author_hash` (SHA-256 of HN username — no raw usernames stored)
+- `parent_comment_id` (null if direct reply to story)
+- `body`, `score`
 
 Limits:
 
 - max comments/topic: 25,000
-- max comments/post: 1,000
-- max comments/fetch: 2,000
+- max comments/story: 1,000
+- max comments/fetch cycle: 2,000
 
-Retention:
-
-- hard strategy supports up to 6 months
-- MVP collection focus is last 1 month
+---
 
 ## 5. Classification
 
-Stance labels:
-
-- `SUPPORT`
-- `OPPOSE`
-- `MIXED`
-- `NEUTRAL`
+**Stance labels:** `SUPPORT` / `OPPOSE` / `MIXED` / `NEUTRAL`
 
 Policy:
 
-- one comment -> one stance label
-- no per-aspect stance in MVP
-- comments that do not reference thread target -> auto `NEUTRAL`
+- one comment → one stance label
+- comments that do not reference thread subject → auto `NEUTRAL`
+- short comments (< 15 words) → classify but flag as low-confidence
 
-Sentiment labels:
+**Sentiment labels:** `POSITIVE` / `NEUTRAL` / `NEGATIVE`
 
-- `POSITIVE`, `NEUTRAL`, `NEGATIVE`
+**Toxicity:** numeric score `0.0–1.0` (Detoxify library)
 
-Toxicity:
+---
 
-- numeric score `0.0-1.0` (UI may map to Low/Medium/High)
+## 6. Stance Framing for HN
 
-## 6. Stance Target Definition
+- **Opinion/Ask HN threads:** stance relative to the parent post's position (agree vs. disagree with the take)
+- **News threads:** stance relative to the entity or event (support vs. oppose the layoff, acquisition, etc.)
 
-Stance is anchored to the post intent:
-
-- transfer posts: approval/disapproval of transfer move
-- performance/decision posts: agreement/disagreement with the take
-
-This avoids ambiguous "stance about what" labeling.
+---
 
 ## 7. Clustering
 
-Similarity definition:
+- Semantic similarity via `all-MiniLM-L6-v2` embeddings + cosine distance
+- KMeans clustered within stance buckets
+- Target: 8–12 clusters per stance bucket
+- Per cluster: 5–10 keywords (TF-IDF), 1 representative quote (centroid-nearest), top 3 quotes by score
 
-- semantic similarity via embeddings + cosine distance
-- cluster within stance buckets to keep outputs readable
+Quality gates:
 
-Cluster policy:
+- suppress clusters with < 8 comments
+- drop quotes under 40 characters
+- if classified comments < 300, show "not enough data yet" and skip clustering view
 
-- target 8-12 clusters per stance bucket
-- show top 5-10 largest clusters in UI
-- per-cluster output:
-  - 5-10 keywords/phrases
-  - 1 representative quote
-  - top 3 quotes
+---
 
-## 8. Quality Gates
+## 8. API Routes
 
-- do not show clusters `< 8` comments
-- drop low-signal quotes (`< 40` chars)
-- if classified comments `< 300`, show "not enough data yet" and skip clustering view
+- `GET /health` — uptime + last ingestion timestamp
+- `GET /api/topics` — list ingested HN threads
+- `POST /api/topics` — create topic
+- `GET /api/comments?topic_id=X` — comments with classification fields
+- `GET /api/clusters?topic_id=X` — argument clusters with keywords and quotes
+- `GET /api/timeline?topic_id=X` — stance percentages per 6-hour bucket over 30 days
 
-## 9. MVP Features
+---
 
-Primary:
+## 9. Frontend Views
 
-- Top arguments (cluster summaries + quotes)
-- Timeline (stance percentages over time)
-- Toxicity trend + toxicity-by-stance
+- **Topic List** — browse ingested threads, sorted by activity; keyword search
+- **Argument Clusters** — tabbed by stance; keywords, representative quote, top comments per cluster
+- **Stance Timeline** — stacked area/line chart of stance percentages over time
+- **Toxicity Dashboard** — toxicity trend + toxicity-by-stance breakdown
+- **Comment Explorer** — filterable table with stance, sentiment, toxicity columns
 
-Secondary:
+Tech: React 18 + TypeScript, Tailwind CSS, TanStack Query (5-minute polling), Recharts, React Router.
 
-- word clouds by stance
-
-Deferred (v2+):
-
-- multi-subreddit heatmaps
-- reply-chain network graph
-- websocket live updates
-
-Dashboard refresh:
-
-- every 5 minutes (polling)
+---
 
 ## 10. Tech Stack
 
-- API: FastAPI
-- ORM: SQLAlchemy 2.0
-- Scheduler: APScheduler
-- Async HTTP: aiohttp
-- Clustering: scikit-learn
-- DB for MVP: PostgreSQL (run locally first)
+- **API:** FastAPI + Uvicorn
+- **ORM:** SQLAlchemy 2.0
+- **DB:** PostgreSQL (asyncpg), Alembic migrations
+- **Scheduler:** APScheduler (30-minute ingestion cadence)
+- **Async HTTP:** aiohttp (HN Firebase API client)
+- **NLP:** sentence-transformers, Detoxify, scikit-learn, TextBlob
+- **Frontend:** React 18, TypeScript, Tailwind, TanStack Query, Recharts
+- **Infra:** Docker Compose (local), Railway (backend), Vercel (frontend), GitHub Actions (CI)
+
+---
 
 ## 11. Implementation Order
 
-1. Local backend stability
-2. Reddit fetch + filtering
-3. Target-aware stance gating
-4. Baseline classifier (150-250 labeled comments)
-5. Embedding + clustering
-6. Timeline/toxicity aggregations
-7. Frontend dashboard
-8. Cloud deployment (Railway/Render)
+1. ✅ Phase 01 — Repository cleanup & HN API client
+2. Phase 02 — Ingestion pipeline (HNIngestionService + comment tree fetcher)
+3. Phase 03 — Classification pipeline (stance, sentiment, toxicity)
+4. Phase 04 — Clustering & analytics aggregation
+5. Phase 05 — Frontend dashboard
+6. Phase 06 — Deployment (Railway + Vercel) & public launch
 
-## 12. Success Definition (MVP)
+---
 
-- stable ingestion from `r/soccer`
-- useful top-argument clusters
-- stance/timeline insights are visible and interpretable
-- private deployment usable by single operator
+## 12. Definition of Done
+
+- Live public URL accessible to anyone, no login required
+- At least 3 HN threads fully ingested with classified comments and rendered clusters
+- Each topic shows ≥2 populated stance clusters with keywords and representative quotes
+- Stance timeline chart populated and updating with new ingestion cycles
+- `/health` endpoint returns last-ingestion timestamp updated within the last hour
+- GitHub Actions CI green on main (backend tests + frontend type-check)
+- README has live URL, architecture diagram, and screenshots
+- No raw HN usernames stored — `author_hash` only throughout

@@ -18,7 +18,7 @@ pip install -r backend/requirements.txt
 ## Configuration
 
 - [ ] Copy env template
-- [ ] Fill Reddit credentials
+- [ ] Confirm HN settings (no credentials required — uses public Firebase API)
 - [ ] Confirm DB URL
 
 ```powershell
@@ -51,10 +51,10 @@ Checks:
 
 ## MVP Scope Validation
 
-- [ ] Subreddit set to `r/soccer`
-- [ ] History set to 30 days
+- [ ] Story types: top, ask, show
+- [ ] Min comments threshold set to 50
 - [ ] Fetch interval set to 30 minutes
-- [ ] Limits: 25k/topic, 1k/post, 2k/fetch
+- [ ] Limits: 25k/topic, 1k/story, 2k/fetch
 - [ ] 4 stance labels configured
 
 ## Done Criteria for Phase 0

@@ -123,28 +123,34 @@ def classify_comments():
 
 
 def cluster_arguments():
-    """Generate argument clusters."""
-    # TODO: Implement clusterer.py
-    logger.info(
-        "cluster_arguments_stub",
-        extra={
-            "event": "cluster_arguments_stub",
-            "component": "clustering",
-            "request_id": "-",
-            "job_name": "cluster",
-        },
-    )
+    """Generate argument clusters for all active topics."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.database import SessionLocal  # noqa: PLC0415
+    from app.models import Topic  # noqa: PLC0415
+    from app.services.clusterer import run_clustering_for_topic  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        topic_ids = [
+            row[0]
+            for row in db.execute(
+                select(Topic.id).where(Topic.status == "active")
+            ).all()
+        ]
+        for tid in topic_ids:
+            run_clustering_for_topic(db, topic_id=tid)
+    finally:
+        db.close()
 
 
 def compute_daily_stats():
-    """Compute daily statistics."""
-    # TODO: Implement analytics.py
-    logger.info(
-        "compute_daily_stats_stub",
-        extra={
-            "event": "compute_daily_stats_stub",
-            "component": "scheduler",
-            "request_id": "-",
-            "job_name": "stats",
-        },
-    )
+    """Compute daily statistics for all active topics."""
+    from app.database import SessionLocal  # noqa: PLC0415
+    from app.services.analytics import run_daily_stats  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        run_daily_stats(db, topic_id=None)
+    finally:
+        db.close()

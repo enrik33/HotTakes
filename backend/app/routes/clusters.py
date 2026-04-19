@@ -5,10 +5,57 @@ Clusters API endpoints.
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Cluster, Comment
+from app.models import Classification, Cluster, Comment
+from app.config import settings
 from typing import Optional
 
 router = APIRouter()
+
+_TOP_QUOTES_LIMIT = 3
+_DEDUP_PREFIX_LEN = 100
+_MIN_CLASSIFIED_COMMENTS = 300
+
+
+def _get_top_quotes(db: Session, cluster_id: int) -> list[dict]:
+    """Return up to 3 de-duplicated top-scoring comments for a cluster.
+
+    Steps:
+      1. Query all comments with this cluster_id.
+      2. Filter to body length >= min_quote_length.
+      3. Order by score desc, take top 10 as candidates.
+      4. De-duplicate by first 100 chars of body.
+      5. Return up to 3 results.
+    """
+    candidates = (
+        db.query(Comment)
+        .filter(Comment.cluster_id == cluster_id)
+        .order_by(Comment.score.desc())
+        .limit(10)
+        .all()
+    )
+
+    seen_prefixes: set[str] = set()
+    quotes: list[dict] = []
+    for comment in candidates:
+        body = comment.body or ""
+        if len(body) < settings.min_quote_length:
+            continue
+        prefix = body[:_DEDUP_PREFIX_LEN]
+        if prefix in seen_prefixes:
+            continue
+        seen_prefixes.add(prefix)
+        quotes.append(
+            {
+                "id": comment.id,
+                "body": body,
+                "author_hash": comment.author_hash,
+                "score": comment.score,
+            }
+        )
+        if len(quotes) >= _TOP_QUOTES_LIMIT:
+            break
+
+    return quotes
 
 
 @router.get("/clusters")
@@ -18,6 +65,25 @@ async def get_clusters(
     db: Session = Depends(get_db),
 ):
     """Get argument clusters for a topic."""
+    # Quality gate: require minimum classified comments before showing clusters
+    classified_count = (
+        db.query(Classification)
+        .filter(
+            Classification.comment_id.in_(
+                db.query(Comment.id).filter(Comment.topic_id == topic_id)
+            )
+        )
+        .count()
+    )
+    if classified_count < _MIN_CLASSIFIED_COMMENTS:
+        return {
+            "topic_id": topic_id,
+            "clustering_available": False,
+            "reason": "insufficient_data",
+            "classified_comments": classified_count,
+            "required": _MIN_CLASSIFIED_COMMENTS,
+        }
+
     query = db.query(Cluster).filter(Cluster.topic_id == topic_id)
 
     if stance:
@@ -30,9 +96,9 @@ async def get_clusters(
     for cluster in clusters:
         keywords = cluster.keywords.split(",") if cluster.keywords else []
 
-        # Get top 3 comments in cluster (by score)
-        # Note: In real implementation, you'd store cluster membership
-        # For now, just get the representative comment
+        top_quotes = _get_top_quotes(db, cluster.id)
+
+        # Representative comment (centroid-closest)
         representative = None
         if cluster.representative_comment_id:
             representative_comment = (
@@ -56,7 +122,7 @@ async def get_clusters(
                 "size": cluster.size,
                 "keywords": keywords,
                 "representative_comment": representative,
-                "top_quotes": [representative] if representative else [],
+                "top_quotes": top_quotes,
             }
         )
 
@@ -64,5 +130,5 @@ async def get_clusters(
         "topic_id": topic_id,
         "clusters": result,
         "total_comments": sum(c.size for c in clusters),
-        "clustering_date": None,  # TODO: Add clustering timestamp
+        "clustering_date": None,
     }

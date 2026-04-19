@@ -96,6 +96,7 @@ class Comment(Base):
     )  # Parent HN item ID (null if direct reply to story)
     permalink = Column(String(500))
     stored_at = Column(DateTime, default=datetime.utcnow)
+    cluster_id = Column(Integer, ForeignKey("clusters.id"), nullable=True, index=True)
 
     __table_args__ = (
         UniqueConstraint(

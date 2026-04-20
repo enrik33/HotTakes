@@ -7,23 +7,23 @@ import DashboardPage from './pages/DashboardPage';
 import './index.css';
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      retry: 1,
+    defaultOptions: {
+        queries: {
+            staleTime: 60_000,
+            retry: 1,
+        },
     },
-  },
 });
 
 const router = createBrowserRouter([
-  { path: '/', element: <TopicsPage /> },
-  { path: '/topics/:id', element: <DashboardPage /> },
+    { path: '/', element: <TopicsPage /> },
+    { path: '/topics/:id', element: <DashboardPage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </React.StrictMode>,
+    <React.StrictMode>
+        <QueryClientProvider client={queryClient}>
+            <RouterProvider router={router} />
+        </QueryClientProvider>
+    </React.StrictMode>,
 );

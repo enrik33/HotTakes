@@ -18,10 +18,36 @@ from app.logging_config import REQUEST_ID_CTX, get_logger, setup_logging
 from app.routes import clusters, comments, health, timeline, topics
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
-# Create tables and initialize logging on startup
-Base.metadata.create_all(bind=engine)
+import time
+
 setup_logging(settings.log_level)
 logger = get_logger(__name__, component="api")
+
+
+def _init_db(retries: int = 10, delay: float = 3.0) -> None:
+    """Create tables, retrying if the DB isn't ready yet."""
+    for attempt in range(1, retries + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
+            logger.info(
+                "db_init_ok",
+                extra={"event": "db_init_ok", "component": "api", "request_id": "-"},
+            )
+            return
+        except Exception as exc:
+            logger.warning(
+                "db_init_retry",
+                extra={
+                    "event": "db_init_retry",
+                    "component": "api",
+                    "request_id": "-",
+                    "attempt": attempt,
+                    "error": str(exc),
+                },
+            )
+            if attempt == retries:
+                raise
+            time.sleep(delay)
 
 
 @asynccontextmanager
@@ -31,6 +57,7 @@ async def lifespan(app: FastAPI):
         "api_startup",
         extra={"event": "api_startup", "component": "api", "request_id": "-"},
     )
+    _init_db()
     if settings.scheduler_enabled:
         start_scheduler()
     yield

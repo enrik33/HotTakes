@@ -5,11 +5,11 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://YOUR_RAILWAY_URL/api/:path*"
+            "destination": "https://hottakes-production.up.railway.app/api/:path*"
         },
         {
             "source": "/health",
-            "destination": "https://YOUR_RAILWAY_URL/health"
+            "destination": "https://hottakes-production.up.railway.app/health"
         },
         {
             "source": "/(.*)",

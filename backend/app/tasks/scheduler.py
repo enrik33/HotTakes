@@ -2,6 +2,8 @@
 Scheduler for background tasks using APScheduler.
 """
 
+import time
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -11,9 +13,17 @@ from app.logging_config import get_logger
 scheduler = BackgroundScheduler()
 logger = get_logger(__name__, component="scheduler")
 
+# Exponential backoff delays between retry attempts (seconds)
+_RETRY_DELAYS = [5, 15, 45]
+_MAX_ATTEMPTS = len(_RETRY_DELAYS) + 1  # 3 delays → 4 total attempts, but we use 3
+
 
 def _run_job(job_name: str, component: str, fn):
-    """Run scheduled job with consistent structured logs."""
+    """Run scheduled job with retry-on-failure and structured metrics logs.
+
+    Retries up to 3 times with exponential backoff (5 s → 15 s → 45 s).
+    Emits a ``job_metrics`` log on completion regardless of outcome.
+    """
     logger.info(
         "job_started",
         extra={
@@ -23,27 +33,77 @@ def _run_job(job_name: str, component: str, fn):
             "job_name": job_name,
         },
     )
-    try:
-        fn()
-        logger.info(
-            "job_succeeded",
-            extra={
-                "event": "job_succeeded",
-                "component": component,
-                "request_id": "-",
-                "job_name": job_name,
-            },
-        )
-    except Exception:
-        logger.exception(
-            "job_failed",
-            extra={
-                "event": "job_failed",
-                "component": component,
-                "request_id": "-",
-                "job_name": job_name,
-            },
-        )
+    start = time.monotonic()
+    last_exc: Exception | None = None
+    attempts = 0
+
+    for attempt_idx, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            time.sleep(delay)
+        attempts += 1
+        try:
+            fn()
+            duration_s = round(time.monotonic() - start, 3)
+            logger.info(
+                "job_succeeded",
+                extra={
+                    "event": "job_succeeded",
+                    "component": component,
+                    "request_id": "-",
+                    "job_name": job_name,
+                },
+            )
+            logger.info(
+                "job_metrics",
+                extra={
+                    "event": "job_metrics",
+                    "component": component,
+                    "request_id": "-",
+                    "job_name": job_name,
+                    "duration_s": duration_s,
+                    "attempts": attempts,
+                    "success": True,
+                },
+            )
+            return
+        except Exception as exc:
+            last_exc = exc
+            logger.warning(
+                "job_attempt_failed",
+                extra={
+                    "event": "job_attempt_failed",
+                    "component": component,
+                    "request_id": "-",
+                    "job_name": job_name,
+                    "attempt": attempts,
+                    "error": str(exc),
+                },
+            )
+
+    # All attempts exhausted
+    duration_s = round(time.monotonic() - start, 3)
+    logger.exception(
+        "job_failed",
+        extra={
+            "event": "job_failed",
+            "component": component,
+            "request_id": "-",
+            "job_name": job_name,
+        },
+        exc_info=last_exc,
+    )
+    logger.error(
+        "job_metrics",
+        extra={
+            "event": "job_metrics",
+            "component": component,
+            "request_id": "-",
+            "job_name": job_name,
+            "duration_s": duration_s,
+            "attempts": attempts,
+            "success": False,
+        },
+    )
 
 
 def start_scheduler():
@@ -72,6 +132,7 @@ def start_scheduler():
             id="cluster",
             name="Cluster arguments",
             replace_existing=True,
+            max_instances=1,
         )
         scheduler.add_job(
             lambda: _run_job("stats", "scheduler", compute_daily_stats),
@@ -79,6 +140,7 @@ def start_scheduler():
             id="stats",
             name="Compute daily stats",
             replace_existing=True,
+            max_instances=1,
         )
         scheduler.start()
         logger.info(

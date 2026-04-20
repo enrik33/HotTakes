@@ -25,9 +25,6 @@ services:
     container_name: hottakes_backend
     environment:
       DATABASE_URL: postgresql://debateuser:debatepass@postgres:5432/social_debate
-      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID}
-      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET}
-      REDDIT_USER_AGENT: ${REDDIT_USER_AGENT}
       SCHEDULER_ENABLED: "false"  # Disable for local dev to avoid conflicts
     ports:
       - "8000:8000"

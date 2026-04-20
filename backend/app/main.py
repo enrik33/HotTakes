@@ -15,7 +15,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.errors import STATUS_CODE_DEFAULTS, build_error_payload
 from app.logging_config import REQUEST_ID_CTX, get_logger, setup_logging
-from app.routes import clusters, comments, health, timeline, topics
+from app.routes import admin, clusters, comments, health, timeline, topics
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 import time
@@ -86,6 +86,7 @@ app.add_middleware(
 
 # Routes
 app.include_router(health.router)
+app.include_router(admin.router, prefix="/api")
 app.include_router(topics.router, prefix="/api", tags=["topics"])
 app.include_router(comments.router, prefix="/api", tags=["comments"])
 app.include_router(clusters.router, prefix="/api", tags=["clusters"])

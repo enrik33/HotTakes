@@ -59,9 +59,13 @@ async def trigger_classify():
 @router.post("/admin/run/classify/sync", tags=["admin"])
 async def trigger_classify_sync():
     """Run classification synchronously and return result or error detail."""
+    from app.database import SessionLocal  # noqa: PLC0415
+    from app.tasks.classify_job import run_classify_job  # noqa: PLC0415
+
+    db = SessionLocal()
     try:
-        classify_comments()
-        return {"status": "ok", "job": "classify"}
+        result = run_classify_job(db)
+        return {"status": "ok", "job": "classify", "result": result}
     except Exception as exc:
         return {
             "status": "error",
@@ -69,6 +73,8 @@ async def trigger_classify_sync():
             "error": str(exc),
             "traceback": traceback.format_exc(),
         }
+    finally:
+        db.close()
 
 
 @router.post("/admin/run/cluster", tags=["admin"])

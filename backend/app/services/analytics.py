@@ -37,7 +37,8 @@ def run_daily_stats(db: "Session", topic_id: int | None = None) -> dict:
     dict
         ``{"topics_processed": int, "rows_upserted": int}``
     """
-    from sqlalchemy import func, select  # noqa: PLC0415
+    from sqlalchemy import cast, func, select  # noqa: PLC0415
+    from sqlalchemy.types import Date  # noqa: PLC0415
 
     from app.models import Classification, Comment, DailyStats, Topic  # noqa: PLC0415
 
@@ -64,9 +65,7 @@ def run_daily_stats(db: "Session", topic_id: int | None = None) -> dict:
         # and use SQLAlchemy core to aggregate.
         stmt = (
             select(
-                func.date(func.datetime(Comment.created_utc, "unixepoch")).label(
-                    "date"
-                ),
+                cast(func.to_timestamp(Comment.created_utc), Date).label("date"),
                 Classification.stance,
                 func.count(Comment.id).label("cnt"),
                 func.avg(Classification.toxicity_score).label("avg_tox"),
@@ -74,7 +73,7 @@ def run_daily_stats(db: "Session", topic_id: int | None = None) -> dict:
             .join(Classification, Classification.comment_id == Comment.id)
             .where(Comment.topic_id == tid)
             .group_by(
-                func.date(func.datetime(Comment.created_utc, "unixepoch")),
+                cast(func.to_timestamp(Comment.created_utc), Date),
                 Classification.stance,
             )
         )

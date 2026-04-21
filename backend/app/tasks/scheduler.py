@@ -3,6 +3,7 @@ Scheduler for background tasks using APScheduler.
 """
 
 import time
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -111,12 +112,15 @@ def start_scheduler():
     if not scheduler.running:
         from app.tasks.fetch_job import run_fetch_job
 
+        now = datetime.now(timezone.utc)
+
         scheduler.add_job(
             lambda: _run_job("fetch_hn", "ingestion", run_fetch_job),
             trigger=IntervalTrigger(minutes=settings.fetch_interval_minutes),
             id="fetch_hn",
             name="Fetch Hacker News data",
             replace_existing=True,
+            next_run_time=now,
         )
         scheduler.add_job(
             lambda: _run_job("classify", "classification", classify_comments),
@@ -125,6 +129,7 @@ def start_scheduler():
             name="Classify comments",
             replace_existing=True,
             max_instances=1,
+            next_run_time=now,
         )
         scheduler.add_job(
             lambda: _run_job("cluster", "clustering", cluster_arguments),
@@ -133,6 +138,7 @@ def start_scheduler():
             name="Cluster arguments",
             replace_existing=True,
             max_instances=1,
+            next_run_time=now,
         )
         scheduler.add_job(
             lambda: _run_job("stats", "scheduler", compute_daily_stats),
@@ -141,6 +147,7 @@ def start_scheduler():
             name="Compute daily stats",
             replace_existing=True,
             max_instances=1,
+            next_run_time=now,
         )
         scheduler.start()
         logger.info(
@@ -173,27 +180,37 @@ def stop_scheduler():
 
 
 def classify_comments():
-    """Classify unclassified comments."""
+    """Classify unclassified comments — loops until none remain."""
     from app.database import SessionLocal  # noqa: PLC0415
     from app.tasks.classify_job import run_classify_job  # noqa: PLC0415
 
     db = SessionLocal()
     try:
-        run_classify_job(db)
+        total = {"classified": 0, "gated": 0, "errors": 0}
+        while True:
+            result = run_classify_job(db)
+            for k in total:
+                total[k] += result.get(k, 0)
+            if result.get("classified", 0) + result.get("gated", 0) == 0:
+                break
     finally:
         db.close()
 
 
 def cluster_arguments():
-    """Generate argument clusters for all active topics."""
+    """Generate embeddings and argument clusters for all active topics."""
     from sqlalchemy import select  # noqa: PLC0415
 
     from app.database import SessionLocal  # noqa: PLC0415
     from app.models import Topic  # noqa: PLC0415
     from app.services.clusterer import run_clustering_for_topic  # noqa: PLC0415
+    from app.services.embedder import generate_comment_embeddings  # noqa: PLC0415
 
     db = SessionLocal()
     try:
+        # Generate embeddings for any unembedded comments first
+        generate_comment_embeddings(db)
+
         topic_ids = [
             row[0]
             for row in db.execute(

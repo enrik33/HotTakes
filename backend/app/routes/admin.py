@@ -58,14 +58,20 @@ async def trigger_classify():
 
 @router.post("/admin/run/classify/sync", tags=["admin"])
 async def trigger_classify_sync():
-    """Run classification synchronously and return result or error detail."""
+    """Run classification synchronously until all comments are classified, then return totals."""
     from app.database import SessionLocal  # noqa: PLC0415
     from app.tasks.classify_job import run_classify_job  # noqa: PLC0415
 
     db = SessionLocal()
     try:
-        result = run_classify_job(db)
-        return {"status": "ok", "job": "classify", "result": result}
+        totals = {"classified": 0, "gated": 0, "errors": 0}
+        while True:
+            result = run_classify_job(db)
+            for k in totals:
+                totals[k] += result.get(k, 0)
+            if result.get("classified", 0) + result.get("gated", 0) == 0:
+                break
+        return {"status": "ok", "job": "classify", "result": totals}
     except Exception as exc:
         return {
             "status": "error",
@@ -79,7 +85,7 @@ async def trigger_classify_sync():
 
 @router.post("/admin/run/cluster", tags=["admin"])
 async def trigger_cluster():
-    """Trigger opinion clustering immediately."""
+    """Trigger embedding generation + opinion clustering immediately."""
     _run_in_background("cluster", cluster_arguments)
     return {"status": "started", "job": "cluster"}
 

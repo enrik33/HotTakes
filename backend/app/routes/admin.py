@@ -90,6 +90,39 @@ async def trigger_cluster():
     return {"status": "started", "job": "cluster"}
 
 
+@router.post("/admin/run/cluster/sync", tags=["admin"])
+async def trigger_cluster_sync():
+    """Run embedding + clustering synchronously and return result."""
+    from app.database import SessionLocal  # noqa: PLC0415
+    from app.models import Topic  # noqa: PLC0415
+    from app.services.clusterer import run_clustering_for_topic  # noqa: PLC0415
+    from app.services.embedder import generate_comment_embeddings  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        embed_result = generate_comment_embeddings(db)
+        topic_ids = [
+            row[0]
+            for row in db.execute(
+                select(Topic.id).where(Topic.status == "active")
+            ).all()
+        ]
+        cluster_results = []
+        for tid in topic_ids:
+            r = run_clustering_for_topic(db, topic_id=tid)
+            cluster_results.append(r)
+        return {"status": "ok", "embed": embed_result, "clusters": cluster_results}
+    except Exception as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+    finally:
+        db.close()
+
+
 @router.post("/admin/run/stats", tags=["admin"])
 async def trigger_stats():
     """Trigger daily stats computation immediately."""

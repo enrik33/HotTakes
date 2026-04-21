@@ -159,9 +159,7 @@ class Embedding(Base):
     comment_id = Column(
         Integer, ForeignKey("comments.id"), nullable=False, index=True, unique=True
     )
-    embedding_vector = Column(
-        String(5000)
-    )  # JSON-serialized float list (or use pgvector if using PostgreSQL)
+    embedding_vector = Column(Text)  # JSON-serialized float list
     computed_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

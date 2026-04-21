@@ -17,6 +17,7 @@ from app.errors import STATUS_CODE_DEFAULTS, build_error_payload
 from app.logging_config import REQUEST_ID_CTX, get_logger, setup_logging
 from app.routes import admin, clusters, comments, health, timeline, topics
 from app.tasks.scheduler import start_scheduler, stop_scheduler
+from sqlalchemy import text
 
 import time
 
@@ -29,6 +30,18 @@ def _init_db(retries: int = 10, delay: float = 3.0) -> None:
     for attempt in range(1, retries + 1):
         try:
             Base.metadata.create_all(bind=engine)
+            # Widen embedding_vector column if it was created as varchar(5000)
+            try:
+                with engine.connect() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE embeddings "
+                            "ALTER COLUMN embedding_vector TYPE TEXT"
+                        )
+                    )
+                    conn.commit()
+            except Exception:
+                pass  # Table may not exist yet on first boot — create_all handles it
             logger.info(
                 "db_init_ok",
                 extra={"event": "db_init_ok", "component": "api", "request_id": "-"},

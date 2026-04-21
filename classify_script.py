@@ -10,7 +10,7 @@ total_gated = 0
 
 for i in range(20):  # max 20 batches
     req = urllib.request.Request(
-        f"{base}/admin/run/classify/sync", method="POST", data=b""
+        f"{base}/api/admin/run/classify/sync", method="POST", data=b""
     )
     req.add_header("Content-Type", "application/json")
     try:
@@ -33,7 +33,7 @@ for i in range(20):  # max 20 batches
 print(f"\nTotal classified: {total_classified}, gated: {total_gated}")
 
 print("\n=== Running stats job ===")
-req = urllib.request.Request(f"{base}/admin/run/stats", method="POST", data=b"")
+req = urllib.request.Request(f"{base}/api/admin/run/stats", method="POST", data=b"")
 req.add_header("Content-Type", "application/json")
 try:
     with urllib.request.urlopen(req, timeout=60) as resp:
@@ -44,7 +44,7 @@ except Exception as e:
 time.sleep(3)
 
 print("\n=== Running cluster job ===")
-req = urllib.request.Request(f"{base}/admin/run/cluster", method="POST", data=b"")
+req = urllib.request.Request(f"{base}/api/admin/run/cluster", method="POST", data=b"")
 req.add_header("Content-Type", "application/json")
 try:
     with urllib.request.urlopen(req, timeout=60) as resp:

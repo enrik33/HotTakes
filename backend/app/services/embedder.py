@@ -85,7 +85,9 @@ def generate_embeddings_batch(
                 continue
             try:
                 model = _get_model()
-                vector = model.encode(text, convert_to_numpy=True).tolist()
+                raw = model.encode(text, convert_to_numpy=True).tolist()
+                # Round to 6 dp so the JSON fits in the varchar column
+                vector = [round(v, 6) for v in raw]
                 results.append(vector)
             except Exception:
                 logger.exception(

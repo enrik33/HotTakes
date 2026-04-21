@@ -3,6 +3,7 @@ Admin endpoints for manually triggering background jobs.
 """
 
 import threading
+import traceback
 
 from fastapi import APIRouter
 
@@ -43,14 +44,6 @@ def _run_in_background(job_name: str, fn):
 async def trigger_ingest():
     """Trigger a Hacker News ingestion run immediately."""
     from app.tasks.fetch_job import run_fetch_job  # noqa: PLC0415
-    from app.database import SessionLocal  # noqa: PLC0415
-
-    def _ingest():
-        db = SessionLocal()
-        try:
-            run_fetch_job()
-        finally:
-            db.close()
 
     _run_in_background("fetch_hn", run_fetch_job)
     return {"status": "started", "job": "ingest"}
@@ -58,9 +51,24 @@ async def trigger_ingest():
 
 @router.post("/admin/run/classify", tags=["admin"])
 async def trigger_classify():
-    """Trigger comment classification immediately."""
+    """Trigger comment classification immediately (background)."""
     _run_in_background("classify", classify_comments)
     return {"status": "started", "job": "classify"}
+
+
+@router.post("/admin/run/classify/sync", tags=["admin"])
+async def trigger_classify_sync():
+    """Run classification synchronously and return result or error detail."""
+    try:
+        classify_comments()
+        return {"status": "ok", "job": "classify"}
+    except Exception as exc:
+        return {
+            "status": "error",
+            "job": "classify",
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+        }
 
 
 @router.post("/admin/run/cluster", tags=["admin"])

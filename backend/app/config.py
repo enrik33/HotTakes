@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # API Settings
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
     api_title: str = "HotTakes"
+    min_classified_comments: int = 10
 
     # Scheduler
     scheduler_enabled: bool = True

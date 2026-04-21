@@ -13,7 +13,9 @@ router = APIRouter()
 
 _TOP_QUOTES_LIMIT = 3
 _DEDUP_PREFIX_LEN = 100
-_MIN_CLASSIFIED_COMMENTS = 300
+# Use setting if provided, otherwise fall back to 10 so topics with <300 comments
+# can still show clusters once classified.
+_MIN_CLASSIFIED_COMMENTS = getattr(settings, "min_classified_comments", 10)
 
 
 def _get_top_quotes(db: Session, cluster_id: int) -> list[dict]:
